@@ -95,12 +95,25 @@ class AppController {
       }
 
       // UNIVERSAL BLOCKING: Use domain-based blocking via hosts for ALL platforms
-      // This is 100% reliable, instant, and prompt-free after initial auth.
       if (this.websiteBlocker) {
         await this.websiteBlocker.blockAppDomains(targetName, action);
       }
       
+      // FORCE IMPACT: If blocking, kill the running processes to clear sockets/cache
+      if (action === 'block') {
+         this._killProcess(targetName);
+      }
+
       resolve({ success: true, appName: targetName, action });
+    });
+  }
+
+  _killProcess(name) {
+    const cmd = this.platform === 'win32' 
+      ? `taskkill /F /IM ${name}.exe /T`
+      : `pkill -9 -i "${name}"`;
+    exec(cmd, (err) => {
+      if (!err) console.log(`Force-terminated ${name} for policy enforcement`);
     });
   }
 
