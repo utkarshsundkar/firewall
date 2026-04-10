@@ -135,7 +135,23 @@ function initServices() {
     }
   });
 
-  // Start network monitoring - push data to renderer
+  // Start global traffic sniffing for WAF inspection
+  trafficSniffer.start(null, (packet) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('device-packet', packet);
+      
+      // Real-time WAF Inspection
+      if (packet.proto === 'HTTP' || packet.proto === 'DNS') {
+        const threat = wafManager.inspectRequest({
+          url: packet.domain,
+          sourceIp: 'Local Client',
+          payload: '' // tcpdump summary only
+        });
+        // result is emitted via wafManager 'attack-detected' event
+      }
+    }
+  });
+
   networkMonitor.start((data) => {
     if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
       mainWindow.webContents.send('network-data', data);

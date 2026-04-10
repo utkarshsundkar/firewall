@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld('aegis', {
   onNetworkData: (callback) => ipcRenderer.on('network-data', (_, data) => callback(data)),
   onThreatAlert: (callback) => ipcRenderer.on('threat-alert', (_, alert) => callback(alert)),
   onWafThreat: (callback) => ipcRenderer.on('waf-threat', (_, threat) => callback(threat)),
+  onDevicePacket: (callback) => ipcRenderer.on('device-packet', (_, packet) => callback(packet)),
   
   // Window controls
   minimize: () => ipcRenderer.send('window-minimize'),

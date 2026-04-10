@@ -1458,18 +1458,23 @@ function initWafTab() {
     showToast('🔥 WAF ATTACK BLOCKED', `${threat.attackType} detected and neutralised.`, 'high');
   });
 
-  // Also hook into general traffic for the stream
-  window.aegis.onNetworkData((data) => {
-    // Only show interesting HTTP-like traffic in the WAF stream
-    if (Math.random() > 0.8) { 
-      const entry = document.createElement('div');
-      entry.style.color = 'var(--text-muted)';
-      entry.style.marginBottom = '4px';
-      const methods = ['GET', 'POST', 'OPTIONS', 'HEAD'];
-      const m = methods[Math.floor(Math.random() * methods.length)];
-      entry.textContent = `[INFO] ${new Date().toLocaleTimeString()} - INBOUND ${m} packet inspected (Source: ${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.x.x)`;
-      streamEl.prepend(entry);
-      if (streamEl.children.length > 50) streamEl.lastChild.remove();
-    }
+  // REAL-TIME Packet Stream from local device
+  window.aegis.onDevicePacket((packet) => {
+    if (!toggle.checked) return;
+
+    const entry = document.createElement('div');
+    entry.style.marginBottom = '4px';
+    entry.style.borderLeft = `2px solid ${packet.proto === 'DNS' ? 'var(--cyan)' : 'var(--green)'}`;
+    entry.style.paddingLeft = '8px';
+    
+    const time = new Date().toLocaleTimeString();
+    const type = packet.proto || 'PKT';
+    const method = packet.method || 'INSPECT';
+    const target = packet.domain || 'Unresolved Host';
+    
+    entry.innerHTML = `<span style="color:var(--text-muted)">[${time}]</span> <span style="color:var(--accent); font-weight:700">${type} ${method}</span> <span style="color:var(--text-secondary)">-></span> ${target}`;
+    
+    streamEl.prepend(entry);
+    if (streamEl.children.length > 100) streamEl.lastChild.remove();
   });
 }

@@ -22,7 +22,9 @@ class TrafficSniffer {
       let iface = 'any'; // Listen on all interfaces (including bridge100 for internet sharing)
 
       // 1) Run tcpdump as background root process. Native macOS auth dialog will appear!
-      const cmd = `tcpdump -l -i ${iface} -n \\"host ${targetIp} and (udp port 53 or tcp port 80 or tcp port 443)\\" > ${this.logFile} 2>&1 &`;
+      // If targetIp is provided, filter for it, otherwise capture all web traffic
+      const filter = targetIp ? `host ${targetIp} and (port 53 or port 80 or port 443)` : `(port 53 or port 80 or port 443)`;
+      const cmd = `tcpdump -l -i ${iface} -n \\"${filter}\\" > ${this.logFile} 2>&1 &`;
       const osa = `osascript -e 'do shell script "${cmd}" with administrator privileges'`;
       
       exec(osa, (err, stdout, stderr) => {
