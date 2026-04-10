@@ -20,7 +20,7 @@ class EnterpriseManager {
   }
 
   // Starts the Admin WebSocket Server
-  startServer() {
+  async startServer() {
     this.mode = 'server';
     const port = 8080;
     
@@ -54,10 +54,25 @@ class EnterpriseManager {
     });
     
     const localIps = this.getLocalIps();
-    return { success: true, ips: localIps, port };
+    let globalUrl = null;
+
+    try {
+      const localtunnel = require('localtunnel');
+      this.tunnel = await localtunnel({ port });
+      // Convert https://xyz.loca.lt to wss://xyz.loca.lt
+      globalUrl = this.tunnel.url.replace(/^http/, 'ws');
+    } catch (e) {
+      console.warn('Localtunnel failed to start:', e);
+    }
+
+    return { success: true, ips: localIps, port, globalUrl };
   }
 
   stopServer() {
+    if (this.tunnel) {
+      this.tunnel.close();
+      this.tunnel = null;
+    }
     if (this.server) {
       this.server.close();
       this.server = null;

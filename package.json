@@ -19,6 +19,7 @@
     "electron": "^28.3.3"
   },
   "dependencies": {
+    "localtunnel": "^2.0.2",
     "node-netstat": "^1.8.0",
     "systeminformation": "^5.22.10",
     "ws": "^8.20.0"

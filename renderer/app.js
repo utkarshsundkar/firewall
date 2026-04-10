@@ -1186,8 +1186,14 @@ function initEnterpriseTab() {
       document.getElementById('btn-ent-host').style.display = 'none';
       document.getElementById('btn-ent-stop').style.display = 'block';
       document.getElementById('ent-server-info').style.display = 'block';
-      document.getElementById('ent-server-ips').innerHTML = res.ips.map(ip => `ws://${ip}:${res.port}`).join('<br/>');
-      showToast('🏢 Admin Server Started', 'Ready to accept Aegis Agent connections.', 'success');
+      
+      let ipHtml = res.ips.map(ip => `ws://${ip}:${res.port}`).join('<br/>');
+      if (res.globalUrl) {
+        ipHtml = `<strong>GLOBAL INTERNET URL:</strong><br/><code style="color:var(--cyan)">${res.globalUrl}</code><br/><br/><strong>Local Network:</strong><br/>${ipHtml}`;
+      }
+      
+      document.getElementById('ent-server-ips').innerHTML = ipHtml;
+      showToast('🏢 Admin Server Started', res.globalUrl ? 'Public Internet Tunnel Active' : 'Ready to accept local Agent connections.', 'success');
       document.getElementById('ent-live-dot').style.display = 'inline-block';
     }
   });
