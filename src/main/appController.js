@@ -111,31 +111,36 @@ class AppController {
     if (this.platform === 'darwin') {
       // Look up the actual path from cache (mdfind gave us real paths)
       const appPath = this._appPathCache[appName.toLowerCase()] || `/Applications/${appName}.app`;
-      const fw = '/usr/libexec/ApplicationFirewall/socketfilterfw';
-      const fwArg = action === 'block' ? '--blockapp' : '--unblockapp';
+      
+      // MAC OUTBOUND KILL-SWITCH: socketfilterfw only blocks incoming connections.
+      // To strictly block outgoing internet (and the app itself), we revoke execute permissions
+      // physically locking the app out of the OS.
+      const chmodArg = action === 'block' ? '000' : '755';
+      const cmd = `chmod ${chmodArg} '${appPath.replace(/'/g, "'\\''")}'`;
 
-      // Use spawnSync to avoid ALL shell escaping issues
+      // Trigger OS Admin Prompt
       const result = spawnSync('osascript', [
         '-e',
-        `do shell script "${fw} ${fwArg} '${appPath.replace(/'/g, "'\\''")}'" with administrator privileges`
+        `do shell script "${cmd}" with administrator privileges`
       ], { timeout: 30000 });
 
       if (result.error) {
-        console.error(`Firewall rule failed for ${appName}:`, result.error.message);
+        console.error(`App Lock failed for ${appName}:`, result.error.message);
       } else {
-        console.log(`Firewall rule applied: ${action} ${appName} [${appPath}]`);
+        console.log(`App Lock physically enforced: ${action} ${appName} [${appPath}]`);
       }
 
     } else if (this.platform === 'win32') {
-      // Windows: find the exe first, then apply the rule
+      // Windows: combine Windows Firewall + ICACLS Execution Deny for double lock
       const ps = `
         $exe = (Get-ChildItem 'C:\\Program Files', 'C:\\Program Files (x86)' -Filter '${appName}.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
         if ($exe) {
           netsh advfirewall firewall ${action === 'block' ? `add rule name="AEGIS-${appName}" dir=out action=block program="$exe"` : `delete rule name="AEGIS-${appName}"`}
+          ${action === 'block' ? `icacls "$exe" /deny Everyone:(X)` : `icacls "$exe" /remove:d Everyone`}
         }
       `;
       const result = spawnSync('powershell', ['-NoProfile', '-Command', ps], { timeout: 15000 });
-      if (result.error) console.error(`Win Firewall failed for ${appName}:`, result.error.message);
+      if (result.error) console.error(`Win App Lock failed for ${appName}:`, result.error.message);
     }
   }
 
