@@ -24,13 +24,16 @@ class EnterpriseManager {
     this.mode = 'server';
     const port = 8080;
     
-    this.server = new WebSocket.Server({ port });
+    // Explicitly bind to 0.0.0.0 to allow external network connections
+    this.server = new WebSocket.Server({ port, host: '0.0.0.0' });
     
+    console.log(`[FLEET SERVER] Admin engine listening on 0.0.0.0:\${port}`);
+
     this.server.on('connection', (ws, req) => {
       const ip = req.socket.remoteAddress.replace(/^.*:/, '');
       const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
       
-      console.log(`[FLEET SERVER] New agent connecting from ${ip}. Assigning ID: ${id}`);
+      console.log(`[FLEET SERVER] INCOMING CONNECTION: Agent at \${ip}. Validating...`);
       
       const agent = { id, ip, hostname: 'Unknown Agent', os: 'Unknown', status: 'online', logs: [] };
       this.agents.set(id, { ws, data: agent });
@@ -117,7 +120,9 @@ class EnterpriseManager {
       
       this.socket.on('open', () => {
         console.log(`[AGENT] Connected to Admin at ${wsUrl}`);
-        this.mainWindow.webContents.send('enterprise-status', { connected: true, server: wsUrl });
+        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+           this.mainWindow.webContents.send('enterprise-status', { connected: true, server: wsUrl });
+        }
         this.startAgentSync();
       });
 

@@ -459,8 +459,8 @@ ipcMain.on('window-maximize', () => {
 ipcMain.on('window-close', () => { if (mainWindow) mainWindow.hide(); });
 
 app.whenReady().then(() => {
-  initServices();
   createWindow();
+  initServices();
   setupTray();
   connectToStandaloneWAF();
 
