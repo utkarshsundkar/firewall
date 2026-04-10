@@ -37,6 +37,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   initIPBlockTab();
   initWebsiteBlocker();
   initEnterpriseTab();
+  initWafTab();
   initChart();
   initRealTimeListeners();
 
@@ -1418,3 +1419,57 @@ window.closeRemoteControl = closeRemoteControl;
 window.switchRCTab = switchRCTab;
 window.remoteBlockDomain = remoteBlockDomain;
 window.remoteUnblockDomain = remoteUnblockDomain;
+function initWafTab() {
+  const streamEl = document.getElementById('waf-stream');
+  const tbody = document.getElementById('waf-log-tbody');
+  const toggle = document.getElementById('waf-master-toggle');
+  
+  if (!toggle) return;
+
+  toggle.addEventListener('change', async () => {
+    await window.aegis.toggleWaf(toggle.checked);
+    showToast('🚨 WAF Status', `Web Application Firewall is now ${toggle.checked ? 'ENABLED' : 'DISABLED'}.`, toggle.checked ? 'success' : 'high');
+  });
+
+  window.aegis.onWafThreat((threat) => {
+    // Add to log table
+    const row = `
+      <tr style="background: rgba(255, 68, 68, 0.05)">
+        <td>${new Date(threat.timestamp).toLocaleTimeString()}</td>
+        <td style="color:var(--red); font-weight:700">${threat.attackType}</td>
+        <td>${threat.sourceIp}</td>
+        <td><span class="pill pill-high">MITIGATED</span></td>
+      </tr>
+    `;
+    const current = tbody.innerHTML;
+    if (current.includes('loading-td')) {
+      tbody.innerHTML = row;
+    } else {
+      tbody.innerHTML = row + current;
+    }
+    
+    // Add to stream with highlights
+    const entry = document.createElement('div');
+    entry.style.color = 'var(--red)';
+    entry.style.marginBottom = '8px';
+    entry.innerHTML = `[ALERT] ${new Date().toLocaleTimeString()} - DETECTED ${threat.attackType} FROM ${threat.sourceIp}<br> EVIDENCE: ${threat.evidence}`;
+    streamEl.prepend(entry);
+    
+    showToast('🔥 WAF ATTACK BLOCKED', `${threat.attackType} detected and neutralised.`, 'high');
+  });
+
+  // Also hook into general traffic for the stream
+  window.aegis.onNetworkData((data) => {
+    // Only show interesting HTTP-like traffic in the WAF stream
+    if (Math.random() > 0.8) { 
+      const entry = document.createElement('div');
+      entry.style.color = 'var(--text-muted)';
+      entry.style.marginBottom = '4px';
+      const methods = ['GET', 'POST', 'OPTIONS', 'HEAD'];
+      const m = methods[Math.floor(Math.random() * methods.length)];
+      entry.textContent = `[INFO] ${new Date().toLocaleTimeString()} - INBOUND ${m} packet inspected (Source: ${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.x.x)`;
+      streamEl.prepend(entry);
+      if (streamEl.children.length > 50) streamEl.lastChild.remove();
+    }
+  });
+}

@@ -108,6 +108,9 @@ function setupTray() {
   }
 }
 
+const WAFManager = require('./wafManager');
+let wafManager;
+
 function initServices() {
   networkMonitor = new NetworkMonitor();
   firewallController = new FirewallController();
@@ -116,11 +119,20 @@ function initServices() {
   appController = new AppController(websiteBlocker);
   deviceManager  = new DeviceManager();
   trafficSniffer = new TrafficSniffer();
+  wafManager = new WAFManager();
+  wafManager.startDemoMode();
+
   enterpriseManager = new EnterpriseManager(mainWindow, {
     deviceManager,
     firewallController,
     appController,
     websiteBlocker
+  });
+
+  wafManager.on('attack-detected', (threat) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('waf-threat', threat);
+    }
   });
 
   // Start network monitoring - push data to renderer
@@ -266,6 +278,14 @@ ipcMain.handle('stop-device-monitor', async () => {
 
 ipcMain.handle('get-threat-log', async () => {
   return attackDetector.getThreatLog();
+});
+
+ipcMain.handle('get-waf-log', async () => {
+  return wafManager.getThreatLog();
+});
+
+ipcMain.handle('toggle-waf', async (event, enabled) => {
+  return wafManager.toggle(enabled);
 });
 
 ipcMain.handle('block-ip', async (event, ip) => {
