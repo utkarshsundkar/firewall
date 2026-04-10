@@ -1,60 +1,83 @@
 /**
  * AppController - Manages per-application network access control
- * Uses OS process list + firewall rules to allow/block apps from network
+ * Uses OS Application Firewall + domain blocking + process kill for triple enforcement
  */
-const { exec } = require('child_process');
+const { exec, execFileSync, spawnSync } = require('child_process');
 const os = require('os');
 
 class AppController {
   constructor(websiteBlocker) {
     this.platform = process.platform;
-    this.appRules = this._getDefaultRules();
+    this.appRules = [];
     this.websiteBlocker = websiteBlocker;
+    // Cache of app paths from mdfind: { name -> fullPath }
+    this._appPathCache = {};
+    // Pre-populate from mdfind on startup
+    this._refreshAppCache();
   }
 
-  _getDefaultRules() {
-    return [
-      { appName: 'Chrome', path: '/Applications/Google Chrome.app', action: 'allow', icon: '🌐', category: 'Browser', dataUsed: '1.2 GB' },
-      { appName: 'Safari', path: '/Applications/Safari.app', action: 'allow', icon: '🧭', category: 'Browser', dataUsed: '456 MB' },
-      { appName: 'Brave', path: '/Applications/Brave Browser.app', action: 'allow', icon: '🦁', category: 'Browser', dataUsed: '312 MB' },
-      { appName: 'Slack', path: '/Applications/Slack.app', action: 'allow', icon: '💬', category: 'Communication', dataUsed: '89 MB' },
-      { appName: 'Discord', path: '/Applications/Discord.app', action: 'allow', icon: '🎮', category: 'Communication', dataUsed: '234 MB' },
-      { appName: 'Zoom', path: '/Applications/zoom.us.app', action: 'allow', icon: '📹', category: 'Communication', dataUsed: '245 MB' },
-      { appName: 'Spotify', path: '/Applications/Spotify.app', action: 'allow', icon: '🎵', category: 'Media', dataUsed: '678 MB' },
-      { appName: 'Steam', path: '/Applications/Steam.app', action: 'allow', icon: '🕹️', category: 'Gaming', dataUsed: '0 B' },
-      { appName: 'VS Code', path: '/Applications/Visual Studio Code.app', action: 'allow', icon: '💻', category: 'Development', dataUsed: '1.2 GB' },
-      { appName: 'Terminal', path: '/Applications/Utilities/Terminal.app', action: 'allow', icon: '⌨️', category: 'System', dataUsed: '12 MB' },
-      { appName: 'Docker', path: '/Applications/Docker.app', action: 'allow', icon: '🐳', category: 'Development', dataUsed: '2.1 GB' },
-      { appName: 'Postman', path: '/Applications/Postman.app', action: 'allow', icon: '🚀', category: 'Development', dataUsed: '45 MB' },
-    ];
+  _refreshAppCache() {
+    try {
+      const stdout = require('child_process').execSync('mdfind "kMDItemKind == Application"', { timeout: 8000 }).toString();
+      const lines = stdout.split('\n').filter(l => l.trim().endsWith('.app'));
+      for (const line of lines) {
+        const p = line.trim();
+        const name = p.split('/').pop().replace('.app', '');
+        // Skip internal/noise entries
+        if (p.includes('node_modules') || p.includes('/Contents/')) continue;
+        this._appPathCache[name.toLowerCase()] = p;
+      }
+    } catch(e) {
+      console.log('mdfind refresh error:', e.message);
+    }
   }
 
   getRunningApps() {
     return new Promise((resolve) => {
       if (this.platform === 'darwin') {
-        // macOS: Use Spotlight for an exhaustive list of every .app on the system
-        exec('mdfind "kMDItemKind == Application" | head -100', { timeout: 8000 }, (err, stdout) => {
+        exec('mdfind "kMDItemKind == Application"', { timeout: 8000 }, (err, stdout) => {
+          const seen = new Set();
           const apps = (stdout || '').split('\n')
-            .filter(a => a.trim() && a.endsWith('.app'))
-            .map(a => ({ 
-              name: a.split('/').pop().replace('.app', '').trim(), 
-              path: a.trim() 
-            }));
-          resolve(apps.sort((a,b) => a.name.localeCompare(b.name)));
+            .filter(a => {
+              const p = a.trim();
+              return p.endsWith('.app') && !p.includes('node_modules') && !p.includes('/Contents/');
+            })
+            .map(a => {
+              const p = a.trim();
+              const name = p.split('/').pop().replace('.app', '').trim();
+              return { name, path: p };
+            })
+            .filter(a => {
+              if (seen.has(a.name.toLowerCase())) return false;
+              seen.add(a.name.toLowerCase());
+              return true;
+            })
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+          // Update path cache from fresh results
+          for (const app of apps) {
+            this._appPathCache[app.name.toLowerCase()] = app.path;
+          }
+
+          resolve(apps);
         });
       } else if (this.platform === 'win32') {
-        // Windows: Deep dive into Program Files
-        exec('powershell "Get-ChildItem \'C:\\Program Files\\\', \'C:\\Program Files (x86)\\\' | Select-Object -ExpandProperty FullName"', { timeout: 8000 }, (err, stdout) => {
+        exec('powershell -NoProfile -Command "Get-ChildItem \'C:\\Program Files\', \'C:\\Program Files (x86)\' | Select-Object -ExpandProperty FullName"', { timeout: 8000 }, (err, stdout) => {
+          const seen = new Set();
           const apps = (stdout || '').split('\n')
             .filter(p => p.trim() && !p.includes('.'))
-            .map(p => ({ 
-              name: p.split('\\').pop().trim(), 
-              path: p.trim() 
-            }));
-          resolve(apps.slice(0, 100));
+            .map(p => ({ name: p.split('\\').pop().trim(), path: p.trim() }))
+            .filter(a => {
+              if (!a.name || seen.has(a.name.toLowerCase())) return false;
+              seen.add(a.name.toLowerCase());
+              return true;
+            })
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .slice(0, 100);
+          resolve(apps);
         });
       } else {
-        resolve(this._getMockRunningApps());
+        resolve([]);
       }
     });
   }
@@ -62,46 +85,66 @@ class AppController {
   getAppRules() { return this.appRules; }
 
   setRule(appName, action) {
-    return new Promise(async (resolve) => {
-      const existing = this.appRules.find(r => r.appName === appName);
+    return new Promise((resolve) => {
+      const existing = this.appRules.find(r => r.appName.toLowerCase() === appName.toLowerCase());
       if (existing) existing.action = action;
       else this.appRules.push({ appName, action, icon: '📱', category: 'Application' });
 
-      // TRIPLE LAYER PROTECTION:
-      // 1. OS Firewall (Hard) - Requires Prompt
-      const fwCmd = this._buildAppFirewallCmd(appName, action);
-      exec(fwCmd, (err) => {
-        if (err) console.error('Firewall Elevation failed/cancelled');
-        
-        // 2. Domain Block (Stealth) - Instant
-        if (this.websiteBlocker) this.websiteBlocker.blockAppDomains(appName, action);
-        
-        // 3. Process Kill (Force) - Absolute
-        if (action === 'block') this._killProcess(appName);
-        
-        resolve({ success: true, appName, action });
-      });
+      // --- LAYER 1: OS Application Firewall (macOS: socketfilterfw, Windows: netsh) ---
+      this._applyFirewallRule(appName, action);
+
+      // --- LAYER 2: Domain-level blackout via hosts file (instant, no prompt) ---
+      if (this.websiteBlocker) {
+        this.websiteBlocker.blockAppDomains(appName.toLowerCase(), action);
+      }
+
+      // --- LAYER 3: Process kill (forces reconnect under new restrictions) ---
+      if (action === 'block') {
+        this._killProcess(appName);
+      }
+
+      resolve({ success: true, appName, action });
     });
   }
 
-  _killProcess(name) {
-    const cmd = this.platform === 'win32' ? `taskkill /F /IM ${name}.exe /T` : `pkill -9 -i "${name}"`;
-    exec(cmd);
+  _applyFirewallRule(appName, action) {
+    if (this.platform === 'darwin') {
+      // Look up the actual path from cache (mdfind gave us real paths)
+      const appPath = this._appPathCache[appName.toLowerCase()] || `/Applications/${appName}.app`;
+      const fw = '/usr/libexec/ApplicationFirewall/socketfilterfw';
+      const fwArg = action === 'block' ? '--blockapp' : '--unblockapp';
+
+      // Use spawnSync to avoid ALL shell escaping issues
+      const result = spawnSync('osascript', [
+        '-e',
+        `do shell script "${fw} ${fwArg} '${appPath.replace(/'/g, "'\\''")}'" with administrator privileges`
+      ], { timeout: 30000 });
+
+      if (result.error) {
+        console.error(`Firewall rule failed for ${appName}:`, result.error.message);
+      } else {
+        console.log(`Firewall rule applied: ${action} ${appName} [${appPath}]`);
+      }
+
+    } else if (this.platform === 'win32') {
+      // Windows: find the exe first, then apply the rule
+      const ps = `
+        $exe = (Get-ChildItem 'C:\\Program Files', 'C:\\Program Files (x86)' -Filter '${appName}.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+        if ($exe) {
+          netsh advfirewall firewall ${action === 'block' ? `add rule name="AEGIS-${appName}" dir=out action=block program="$exe"` : `delete rule name="AEGIS-${appName}"`}
+        }
+      `;
+      const result = spawnSync('powershell', ['-NoProfile', '-Command', ps], { timeout: 15000 });
+      if (result.error) console.error(`Win Firewall failed for ${appName}:`, result.error.message);
+    }
   }
 
-  _buildAppFirewallCmd(appName, action) {
+  _killProcess(name) {
     if (this.platform === 'win32') {
-      const findExe = `(Get-ChildItem -Path 'C:\\Program Files', 'C:\\Program Files (x86)' -Filter '${appName}.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1).FullName`;
-      if (action === 'block') {
-        return `powershell -NoProfile -Command "Start-Process netsh -ArgumentList 'advfirewall firewall add rule name=\\"AEGIS-${appName}\\" dir=out action=block program=\\"' + (${findExe}) + '\\"' -Verb RunAs"`;
-      } else {
-        return `powershell -NoProfile -Command "Start-Process netsh -ArgumentList 'advfirewall firewall delete rule name=\\"AEGIS-${appName}\\"' -Verb RunAs"`;
-      }
+      exec(`taskkill /F /IM "${name}.exe" /T`);
     } else {
-      const appPath = `/Applications/${appName}.app`;
-      const fw = '/usr/libexec/ApplicationFirewall/socketfilterfw';
-      const cmd = action === 'block' ? `${fw} --blockapp "${appPath}"` : `${fw} --unblockapp "${appPath}"`;
-      return `osascript -e 'do shell script "${cmd}" with administrator privileges'`;
+      // Try exact name first, then fuzzy
+      exec(`pkill -9 -i "${name}" || pkill -9 -f "${name}"`);
     }
   }
 }

@@ -771,11 +771,26 @@ function initAppControlTab() {
 
 async function loadAppRules() {
   try {
-    const [rules, allDomains] = await Promise.all([
+    const [runningApps, rules, allDomains] = await Promise.all([
+      window.aegis.getRunningApps(),
       window.aegis.getAppRules(),
       window.aegis.getAllAppDomains()
     ]);
-    state.appRules = rules;
+    
+    // Merge running apps into rules for UI mapping
+    const combinedApps = runningApps.map(app => {
+       const rule = rules.find(r => r.appName.toLowerCase() === app.name.toLowerCase());
+       return { 
+         appName: app.name, 
+         path: app.path, 
+         action: rule ? rule.action : 'allow',
+         icon: rule ? rule.icon : '📱',
+         category: rule ? rule.category : 'Application',
+         dataUsed: '0 B'
+       };
+    });
+
+    state.appRules = combinedApps;
     state.allAppDomains = allDomains;
     renderAppGrid();
   } catch (e) {
