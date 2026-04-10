@@ -6,9 +6,10 @@ const { exec } = require('child_process');
 const os = require('os');
 
 class AppController {
-  constructor() {
+  constructor(websiteBlocker) {
     this.platform = process.platform;
     this.appRules = this._getDefaultRules();
+    this.websiteBlocker = websiteBlocker;
   }
 
   _getDefaultRules() {
@@ -75,14 +76,14 @@ class AppController {
   }
 
   setRule(appName, action) {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       const existing = this.appRules.find(r => r.appName === appName);
       if (existing) {
         existing.action = action;
       } else {
         this.appRules.push({
           appName,
-          path: `/Applications/${appName}.app`,
+          path: this.platform === 'darwin' ? `/Applications/${appName}.app` : `C:\\Program Files\\${appName}`,
           action,
           icon: '📱',
           category: 'User App',
@@ -90,11 +91,17 @@ class AppController {
         });
       }
 
-      // Apply real firewall rule based on platform
-      const cmd = this._buildAppFirewallCmd(appName, action);
-      exec(cmd, () => {
+      if (this.platform === 'win32' && this.websiteBlocker) {
+        // Robust approach: Block app domains in hosts (Instant, No Prompt)
+        await this.websiteBlocker.blockAppDomains(appName, action);
         resolve({ success: true, appName, action });
-      });
+      } else {
+        // macOS: Use socketfilterfw
+        const cmd = this._buildAppFirewallCmd(appName, action);
+        exec(cmd, () => {
+          resolve({ success: true, appName, action });
+        });
+      }
     });
   }
 

@@ -107,8 +107,8 @@ function initServices() {
   networkMonitor = new NetworkMonitor();
   firewallController = new FirewallController();
   attackDetector = new AttackDetector();
-  appController = new AppController();
   websiteBlocker = new WebsiteBlocker();
+  appController = new AppController(websiteBlocker);
   deviceManager  = new DeviceManager();
   trafficSniffer = new TrafficSniffer();
   enterpriseManager = new EnterpriseManager(mainWindow, {
