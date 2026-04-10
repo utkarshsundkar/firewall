@@ -16,7 +16,7 @@ class WAFManager extends EventEmitter {
       { name: 'SQL Injection', id: 'sqli', regex: /(UNION\s+SELECT|SELECT\s+.*\s+FROM|INSERT\s+INTO|DROP\s+TABLE|--|' OR '1'='1'|--\+|#)/i, severity: 'critical' },
       { name: 'Cross-Site Scripting (XSS)', id: 'xss', regex: /(<script>|javascript:|alert\(|onerror=|onload=|document\.cookie|%3Cscript%3E)/i, severity: 'high' },
       { name: 'Path Traversal', id: 'lfi', regex: /(\.\.\/|\.\.\\|%2e%2e%2f|etc\/passwd|\/windows\/system32)/i, severity: 'high' },
-      { name: 'Remote Code Execution (RCE)', id: 'rce', regex: /(curl\s|wget\s|powershell|cmd\.exe|/bin/sh|/bin/bash)/i, severity: 'critical' },
+      { name: 'Remote Code Execution (RCE)', id: 'rce', regex: /(curl\s|wget\s|powershell|cmd\.exe|\/bin\/sh|\/bin\/bash)/i, severity: 'critical' },
       { name: 'Command Injection', id: 'cmd', regex: /(;|\&\&|\|)\s*(cat|ls|id|whoami|nc|netcat)/i, severity: 'high' }
     ];
   }
