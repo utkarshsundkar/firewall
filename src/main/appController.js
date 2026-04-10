@@ -111,9 +111,9 @@ class AppController {
       const appPath = `/Applications/${appName}.app`;
       const firewallPath = '/usr/libexec/ApplicationFirewall/socketfilterfw';
       if (action === 'block') {
-         return `osascript -e 'do shell script "${firewallPath} --blockapp \\"${appPath}\\"" with administrator privileges'`;
+         return `"${firewallPath}" --blockapp "${appPath}" 2>/dev/null || true`;
       } else {
-         return `osascript -e 'do shell script "${firewallPath} --unblockapp \\"${appPath}\\"" with administrator privileges'`;
+         return `"${firewallPath}" --unblockapp "${appPath}" 2>/dev/null || true`;
       }
     }
   }

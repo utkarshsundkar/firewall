@@ -52,8 +52,7 @@ class FirewallController {
       return new Promise((resolve) => exec(cmd, () => resolve({ success: true, enabled: this.enabled })));
     } else {
       const cmd = enable ? 'pfctl -E' : 'pfctl -d';
-      const osa = `osascript -e 'do shell script "${cmd} 2>/dev/null || true" with administrator privileges'`;
-      return new Promise((resolve) => exec(osa, () => resolve({ success: true, enabled: this.enabled })));
+      return new Promise((resolve) => exec(`${cmd} 2>/dev/null || true`, () => resolve({ success: true, enabled: this.enabled })));
     }
   }
 
@@ -105,8 +104,7 @@ class FirewallController {
         });
       } else {
         const pfRule = `block in from ${ip} to any`;
-        const osa = `osascript -e 'do shell script "echo \\"${pfRule}\\" | pfctl -ef - 2>/dev/null || true" with administrator privileges'`;
-        exec(osa, () => {
+        exec(`echo "${pfRule}" | pfctl -ef - 2>/dev/null || true`, () => {
           resolve({ success: true, ip, blockedAt: Date.now() });
         });
       }
@@ -121,8 +119,7 @@ class FirewallController {
           resolve({ success: true, ip });
         });
       } else {
-        const osa = `osascript -e 'do shell script "pfctl -F all 2>/dev/null || true" with administrator privileges'`;
-        exec(osa, () => {
+        exec(`pfctl -F all 2>/dev/null || true`, () => {
           resolve({ success: true, ip });
         });
       }
@@ -138,7 +135,7 @@ class FirewallController {
       const proto = rule.protocol.toLowerCase();
       const port = rule.port && rule.port !== 'any' ? `port ${rule.port}` : '';
       const pfRule = `${action} ${dir} on any proto ${proto} from any to any ${port}`;
-      return `osascript -e 'do shell script "echo \\"${pfRule}\\" | pfctl -ef - 2>/dev/null || true" with administrator privileges'`;
+      return `echo "${pfRule}" | pfctl -ef - 2>/dev/null || true`;
     }
   }
 }
