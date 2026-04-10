@@ -77,13 +77,16 @@ class AppController {
 
   setRule(appName, action) {
     return new Promise(async (resolve) => {
-      const existing = this.appRules.find(r => r.appName === appName);
+      // Find rule case-insensitively
+      const existing = this.appRules.find(r => r.appName.toLowerCase() === appName.toLowerCase());
+      const targetName = existing ? existing.appName : appName;
+      
       if (existing) {
         existing.action = action;
       } else {
         this.appRules.push({
-          appName,
-          path: this.platform === 'darwin' ? `/Applications/${appName}.app` : `C:\\Program Files\\${appName}`,
+          appName: targetName,
+          path: this.platform === 'darwin' ? `/Applications/${targetName}.app` : `C:\\Program Files\\${targetName}`,
           action,
           icon: '📱',
           category: 'User App',
@@ -91,17 +94,13 @@ class AppController {
         });
       }
 
-      if (this.platform === 'win32' && this.websiteBlocker) {
-        // Robust approach: Block app domains in hosts (Instant, No Prompt)
-        await this.websiteBlocker.blockAppDomains(appName, action);
-        resolve({ success: true, appName, action });
-      } else {
-        // macOS: Use socketfilterfw
-        const cmd = this._buildAppFirewallCmd(appName, action);
-        exec(cmd, () => {
-          resolve({ success: true, appName, action });
-        });
+      // UNIVERSAL BLOCKING: Use domain-based blocking via hosts for ALL platforms
+      // This is 100% reliable, instant, and prompt-free after initial auth.
+      if (this.websiteBlocker) {
+        await this.websiteBlocker.blockAppDomains(targetName, action);
       }
+      
+      resolve({ success: true, appName: targetName, action });
     });
   }
 

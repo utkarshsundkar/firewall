@@ -17,19 +17,20 @@ const HOSTS_PATH = process.platform === 'win32'
   ? 'C:\\Windows\\System32\\drivers\\etc\\hosts'
   : '/etc/hosts';
 
-// Known domains per app — used by App Control
+// Known domains per app (LOWERCASE KEYS) — used by App Control
 const APP_DOMAINS = {
-  'Discord':      ['discord.com', 'discordapp.com', 'discord.gg', 'cdn.discordapp.com', 'gateway.discord.gg', 'media.discordapp.net'],
-  'Spotify':      ['spotify.com', 'spclient.wg.spotify.com', 'apresolve.spotify.com', 'audio-ec.spotify.com'],
-  'Slack':        ['slack.com', 'api.slack.com', 'files.slack.com', 'wss-primary.slack.com'],
-  'Zoom':         ['zoom.us', 'zoomgov.com', 'zmtrack.net'],
-  'Steam':        ['steampowered.com', 'steamcommunity.com', 'steamstatic.com'],
-  'VS Code':      ['vscode.dev', 'update.code.visualstudio.com'],
-  'Chrome':       ['google.com', 'google-analytics.com'],
-  'Brave':        ['brave.com', 'basicattentiontoken.org'],
-  'Safari':       ['apple.com', 'icloud.com'],
-  'Docker':       ['docker.com', 'docker.io'],
-  'Postman':      ['postman.com', 'getpostman.com'],
+  'discord':      ['discord.com', 'discordapp.com', 'discord.gg', 'cdn.discordapp.com', 'gateway.discord.gg', 'media.discordapp.net'],
+  'spotify':      ['spotify.com', 'spclient.wg.spotify.com', 'apresolve.spotify.com', 'audio-ec.spotify.com', 'scannables.byspotify.com'],
+  'slack':        ['slack.com', 'api.slack.com', 'files.slack.com', 'wss-primary.slack.com', 'slack-msgs.com', 'slack-edge.com'],
+  'zoom':         ['zoom.us', 'zoomgov.com', 'zmtrack.net', 'zoom.com', 'zoom.com.cn'],
+  'dropbox':      ['dropbox.com', 'dropboxapi.com', 'dropboxusercontent.com'],
+  'steam':        ['steampowered.com', 'steamcommunity.com', 'steamstatic.com', 'steam-chat.com', 'steamserver.net'],
+  'vs code':      ['vscode.dev', 'update.code.visualstudio.com', 'vscodeweb.azureedge.net', 'visualstudio.com'],
+  'chrome':       ['google.com', 'google-analytics.com', 'googleapis.com', 'googleusercontent.com', 'googletagmanager.com', 'gstatic.com'], 
+  'brave':        ['brave.com', 'basicattentiontoken.org', 'bravesoftware.com'],
+  'safari':       ['apple.com', 'icloud.com', 'mzstatic.com'],
+  'docker':       ['docker.com', 'docker.io', 'docker.com'],
+  'postman':      ['postman.com', 'getpostman.com', 'postman.co'],
 };
 
 class WebsiteBlocker {
@@ -162,7 +163,7 @@ class WebsiteBlocker {
 
   blockAppDomains(appName, action) {
     return new Promise(async (resolve) => {
-      const domains = APP_DOMAINS[appName] || [];
+      const domains = APP_DOMAINS[appName.toLowerCase()] || [];
       if (domains.length === 0) return resolve({ success: true, domains: [] });
 
       const results = [];
