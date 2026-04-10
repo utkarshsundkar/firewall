@@ -30,12 +30,15 @@ class EnterpriseManager {
       const ip = req.socket.remoteAddress.replace(/^.*:/, '');
       const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
       
+      console.log(`[FLEET SERVER] New agent connecting from ${ip}. Assigning ID: ${id}`);
+      
       const agent = { id, ip, hostname: 'Unknown Agent', os: 'Unknown', status: 'online', logs: [] };
       this.agents.set(id, { ws, data: agent });
 
       ws.on('message', (message) => {
         try {
           const payload = JSON.parse(message);
+          console.log(`[FLEET SERVER] Msg from ${id}: ${payload.type}`);
           this.handleAgentMessage(id, payload);
         } catch (e) {
           console.error('Enterprise: Error parsing agent message', e);
@@ -43,6 +46,7 @@ class EnterpriseManager {
       });
 
       ws.on('close', () => {
+        console.log(`[FLEET SERVER] Agent ${id} disconnected.`);
         const ag = this.agents.get(id);
         if (ag) ag.data.status = 'offline';
         this.broadcastAgents(); // notify UI
@@ -50,6 +54,7 @@ class EnterpriseManager {
       });
       
       // Request initial handshake
+      console.log(`[FLEET SERVER] Requesting handshake from ${id}...`);
       ws.send(JSON.stringify({ type: 'HANDSHAKE_REQ' }));
     });
     
@@ -86,23 +91,32 @@ class EnterpriseManager {
     this.mode = 'agent';
     
     // Normalize URL
-    let wsUrl = connectStr;
+    let wsUrl = connectStr.trim();
     if (!wsUrl.includes('://')) {
       wsUrl = `ws://${wsUrl}${wsUrl.includes(':') ? '' : ':8080'}`;
     }
+    
+    // Force secure protocol if using localtunnel
+    if (wsUrl.startsWith('https://')) {
+      wsUrl = wsUrl.replace('https://', 'wss://');
+    }
+
+    console.log(`[AGENT] Attempting connection to: ${wsUrl}`);
 
     try {
       // Bypassing Localtunnel Interstitial Page
-      const options = {};
-      if (wsUrl.includes('.loca.lt')) {
-        options.headers = {
-          'Bypass-Tunnel-Reminder': 'true'
-        };
-      }
+      const options = {
+        headers: {
+          'Bypass-Tunnel-Reminder': 'true',
+          'User-Agent': 'Aegis-Fleet-Agent'
+        },
+        timeout: 10000
+      };
 
       this.socket = new WebSocket(wsUrl, options);
       
       this.socket.on('open', () => {
+        console.log(`[AGENT] Connected to Admin at ${wsUrl}`);
         this.mainWindow.webContents.send('enterprise-status', { connected: true, server: wsUrl });
         this.startAgentSync();
       });
@@ -233,13 +247,27 @@ class EnterpriseManager {
 
   // Pushes a command to ALL connected agents simultaneously
   broadcastCommand(type, payload) {
-    if (this.mode !== 'server') return;
+    if (this.mode !== 'server') {
+      console.warn('Cannot broadcast: Not in server mode');
+      return false;
+    }
+    
+    console.log(`[FLEET BROADCAST] Pulsing command ${type} to ${this.agents.size} agents...`);
+    
     const msg = JSON.stringify({ type, ...payload });
-    this.agents.forEach(ag => {
-      if (ag.ws.readyState === WebSocket.OPEN) {
+    let count = 0;
+    
+    this.agents.forEach((ag, id) => {
+      if (ag.ws && ag.ws.readyState === WebSocket.OPEN) {
         ag.ws.send(msg);
+        count++;
+        console.log(` -> Sent to agent ${id} (${ag.data.hostname})`);
+      } else {
+        console.warn(` -> Agent ${id} socket not open, skipping.`);
       }
     });
+
+    console.log(`[FLEET BROADCAST] Completed. reached ${count} agents.`);
     return true;
   }
 
