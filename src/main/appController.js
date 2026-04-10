@@ -13,18 +13,18 @@ class AppController {
 
   _getDefaultRules() {
     return [
-      { appName: 'Zoom', path: '/Applications/zoom.us.app', action: 'allow', icon: '📹', category: 'Communication', dataUsed: '245 MB' },
-      { appName: 'Slack', path: '/Applications/Slack.app', action: 'allow', icon: '💬', category: 'Communication', dataUsed: '89 MB' },
       { appName: 'Chrome', path: '/Applications/Google Chrome.app', action: 'allow', icon: '🌐', category: 'Browser', dataUsed: '1.2 GB' },
       { appName: 'Safari', path: '/Applications/Safari.app', action: 'allow', icon: '🧭', category: 'Browser', dataUsed: '456 MB' },
-      { appName: 'Spotify', path: '/Applications/Spotify.app', action: 'allow', icon: '🎵', category: 'Media', dataUsed: '678 MB' },
-      { appName: 'Dropbox', path: '/Applications/Dropbox.app', action: 'allow', icon: '📦', category: 'Cloud Storage', dataUsed: '2.1 GB' },
-      { appName: 'Terminal', path: '/Applications/Utilities/Terminal.app', action: 'allow', icon: '⌨️', category: 'System', dataUsed: '12 MB' },
-      { appName: 'BitTorrent', path: '/Applications/BitTorrent.app', action: 'block', icon: '⚡', category: 'P2P', dataUsed: '0 B' },
-      { appName: 'TeamViewer', path: '/Applications/TeamViewer.app', action: 'block', icon: '🖥️', category: 'Remote Access', dataUsed: '0 B' },
-      { appName: 'Tor Browser', path: '/Applications/Tor Browser.app', action: 'block', icon: '🔒', category: 'Anonymous', dataUsed: '0 B' },
-      { appName: 'VLC', path: '/Applications/VLC.app', action: 'allow', icon: '🎬', category: 'Media', dataUsed: '34 MB' },
+      { appName: 'Brave', path: '/Applications/Brave Browser.app', action: 'allow', icon: '🦁', category: 'Browser', dataUsed: '312 MB' },
+      { appName: 'Slack', path: '/Applications/Slack.app', action: 'allow', icon: '💬', category: 'Communication', dataUsed: '89 MB' },
       { appName: 'Discord', path: '/Applications/Discord.app', action: 'allow', icon: '🎮', category: 'Communication', dataUsed: '234 MB' },
+      { appName: 'Zoom', path: '/Applications/zoom.us.app', action: 'allow', icon: '📹', category: 'Communication', dataUsed: '245 MB' },
+      { appName: 'Spotify', path: '/Applications/Spotify.app', action: 'allow', icon: '🎵', category: 'Media', dataUsed: '678 MB' },
+      { appName: 'Steam', path: '/Applications/Steam.app', action: 'allow', icon: '🕹️', category: 'Gaming', dataUsed: '0 B' },
+      { appName: 'VS Code', path: '/Applications/Visual Studio Code.app', action: 'allow', icon: '💻', category: 'Development', dataUsed: '1.2 GB' },
+      { appName: 'Terminal', path: '/Applications/Utilities/Terminal.app', action: 'allow', icon: '⌨️', category: 'System', dataUsed: '12 MB' },
+      { appName: 'Docker', path: '/Applications/Docker.app', action: 'allow', icon: '🐳', category: 'Development', dataUsed: '2.1 GB' },
+      { appName: 'Postman', path: '/Applications/Postman.app', action: 'allow', icon: '🚀', category: 'Development', dataUsed: '45 MB' },
     ];
   }
 
@@ -109,10 +109,11 @@ class AppController {
     } else {
       // macOS: use Application Firewall (socketfilterfw)
       const appPath = `/Applications/${appName}.app`;
+      const firewallPath = '/usr/libexec/ApplicationFirewall/socketfilterfw';
       if (action === 'block') {
-        return `/usr/libexec/ApplicationFirewall/socketfilterfw --blockapp "${appPath}" 2>/dev/null`;
+         return `osascript -e 'do shell script "${firewallPath} --blockapp \\"${appPath}\\"" with administrator privileges'`;
       } else {
-        return `/usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp "${appPath}" 2>/dev/null`;
+         return `osascript -e 'do shell script "${firewallPath} --unblockapp \\"${appPath}\\"" with administrator privileges'`;
       }
     }
   }

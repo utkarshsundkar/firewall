@@ -47,17 +47,14 @@ class FirewallController {
 
   toggle(enable) {
     this.enabled = enable;
-    // On a real system with elevated privileges, this would call pfctl -E/-d or netsh
-    const cmd = this.platform === 'win32'
-      ? (enable ? 'netsh advfirewall set allprofiles state on' : 'netsh advfirewall set allprofiles state off')
-      : (enable ? 'sudo pfctl -E 2>/dev/null' : 'sudo pfctl -d 2>/dev/null');
-
-    return new Promise((resolve) => {
-      exec(cmd, (err) => {
-        // Silently succeed even without root — UI reflects intended state
-        resolve({ success: true, enabled: this.enabled });
-      });
-    });
+    if (this.platform === 'win32') {
+      const cmd = enable ? 'netsh advfirewall set allprofiles state on' : 'netsh advfirewall set allprofiles state off';
+      return new Promise((resolve) => exec(cmd, () => resolve({ success: true, enabled: this.enabled })));
+    } else {
+      const cmd = enable ? 'pfctl -E' : 'pfctl -d';
+      const osa = `osascript -e 'do shell script "${cmd} 2>/dev/null || true" with administrator privileges'`;
+      return new Promise((resolve) => exec(osa, () => resolve({ success: true, enabled: this.enabled })));
+    }
   }
 
   getRules() {
@@ -102,26 +99,33 @@ class FirewallController {
   blockIP(ip) {
     return new Promise((resolve) => {
       this.blockedIPs.add(ip);
-      const cmd = this.platform === 'win32'
-        ? `netsh advfirewall firewall add rule name="Block-${ip}" dir=in action=block remoteip=${ip}`
-        : `echo "block in from ${ip} to any" | sudo pfctl -ef - 2>/dev/null`;
-
-      exec(cmd, () => {
-        resolve({ success: true, ip, blockedAt: Date.now() });
-      });
+      if (this.platform === 'win32') {
+        exec(`netsh advfirewall firewall add rule name="Block-${ip}" dir=in action=block remoteip=${ip}`, () => {
+          resolve({ success: true, ip, blockedAt: Date.now() });
+        });
+      } else {
+        const pfRule = `block in from ${ip} to any`;
+        const osa = `osascript -e 'do shell script "echo \\"${pfRule}\\" | pfctl -ef - 2>/dev/null || true" with administrator privileges'`;
+        exec(osa, () => {
+          resolve({ success: true, ip, blockedAt: Date.now() });
+        });
+      }
     });
   }
 
   unblockIP(ip) {
     return new Promise((resolve) => {
       this.blockedIPs.delete(ip);
-      const cmd = this.platform === 'win32'
-        ? `netsh advfirewall firewall delete rule name="Block-${ip}"`
-        : `sudo pfctl -F all 2>/dev/null`;
-
-      exec(cmd, () => {
-        resolve({ success: true, ip });
-      });
+      if (this.platform === 'win32') {
+        exec(`netsh advfirewall firewall delete rule name="Block-${ip}"`, () => {
+          resolve({ success: true, ip });
+        });
+      } else {
+        const osa = `osascript -e 'do shell script "pfctl -F all 2>/dev/null || true" with administrator privileges'`;
+        exec(osa, () => {
+          resolve({ success: true, ip });
+        });
+      }
     });
   }
 
@@ -133,7 +137,8 @@ class FirewallController {
       const dir = rule.direction === 'out' ? 'out' : 'in';
       const proto = rule.protocol.toLowerCase();
       const port = rule.port && rule.port !== 'any' ? `port ${rule.port}` : '';
-      return `echo "${action} ${dir} on en0 proto ${proto} from any to any ${port}" | sudo pfctl -ef - 2>/dev/null`;
+      const pfRule = `${action} ${dir} on any proto ${proto} from any to any ${port}`;
+      return `osascript -e 'do shell script "echo \\"${pfRule}\\" | pfctl -ef - 2>/dev/null || true" with administrator privileges'`;
     }
   }
 }

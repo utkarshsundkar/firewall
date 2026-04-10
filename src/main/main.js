@@ -47,11 +47,24 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+    // Trigger one-time authorization on startup to cache credentials
+    checkAuthorization();
   });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+}
+
+function checkAuthorization() {
+  if (process.platform === 'darwin') {
+    const cmd = "echo 'Aegis Security Authorized'";
+    const osa = `osascript -e 'do shell script "${cmd}" with administrator privileges'`;
+    exec(osa, (err) => {
+      if (err) console.log('Initial auth cancelled or failed');
+      else console.log('Aegis authorized');
+    });
+  }
 }
 
 function setupTray() {

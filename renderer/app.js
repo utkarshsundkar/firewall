@@ -1393,21 +1393,30 @@ window.aegis.onEntAgentState(({ agentId, state }) => {
   // 3. App Rules
   if (state.appRules) {
     const grid = document.getElementById('rc-app-grid');
-    const apps = ['Chrome', 'Discord', 'Steam', 'Spotify', 'Slack', 'VS Code'];
     
-    grid.innerHTML = apps.map(app => {
-      const isBlocked = state.appRules[app] === 'block';
+    grid.innerHTML = state.appRules.map(appRule => {
+      const isBlocked = appRule.action === 'block';
+      const statusColor = isBlocked ? 'var(--red)' : 'var(--green)';
+      
       return `
-      <div class="rc-app-card" style="border-color: ${isBlocked ? 'var(--red)' : 'var(--border-light)'}">
-        <div>
-          <h4>${app}</h4>
-          <p>${isBlocked ? 'Blocked' : 'Allowed'}</p>
+      <div class="rc-app-card" style="border-color: ${isBlocked ? 'var(--red)' : 'var(--border-light)'}; background: ${isBlocked ? 'rgba(239,68,68,0.06)' : 'var(--bg-card)'}; border-left: 3px solid ${statusColor};">
+        <div style="flex:1">
+          <h4 style="display:flex; align-items:center; gap:8px; margin:0">
+            <span style="font-size:20px">${appRule.icon || '📱'}</span> 
+            ${appRule.appName}
+          </h4>
+          <p style="margin:4px 0 0 0; font-size:11px; font-weight:700; color:${statusColor}; letter-spacing:0.05em">
+             ${isBlocked ? '🛡️ BLOCKED' : '✅ ALLOWED'}
+          </p>
+          <p style="margin:2px 0 0 0; font-size:10px; color:var(--text-muted)">${appRule.category || 'Application'}</p>
         </div>
-        <button class="btn-sm ${isBlocked ? 'allow-btn' : 'block-btn'}" onclick="remoteSetApp('${app}', '${isBlocked ? 'allow' : 'block'}')">
-          ${isBlocked ? 'Allow' : 'Block'}
+        <button class="btn-sm ${isBlocked ? 'allow-btn' : 'block-btn'}" 
+                style="min-width: 80px"
+                onclick="remoteSetApp('${appRule.appName.replace(/'/g, "\\'")}', '${isBlocked ? 'allow' : 'block'}')">
+          ${isBlocked ? 'Unblock' : 'Block'}
         </button>
       </div>`;
-    }).join('');
+    }).join('') || '<div class="loading-td">No applications found on remote system.</div>';
   }
 
   // 4. Web Blocker
