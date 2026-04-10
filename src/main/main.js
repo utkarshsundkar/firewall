@@ -49,7 +49,7 @@ function createWindow() {
     mainWindow.show();
     // Trigger one-time authorization on startup to cache credentials
     checkAuthorization(() => {
-        initServices();
+        startHighPrivilegeServices();
     });
   });
 
@@ -126,7 +126,6 @@ function initServices() {
   deviceManager  = new DeviceManager();
   trafficSniffer = new TrafficSniffer();
   wafManager = new WAFManager();
-  wafManager.startDemoMode();
 
   enterpriseManager = new EnterpriseManager(mainWindow, {
     deviceManager,
@@ -134,7 +133,11 @@ function initServices() {
     appController,
     websiteBlocker
   });
+}
 
+function startHighPrivilegeServices() {
+  wafManager.startDemoMode();
+  
   wafManager.on('attack-detected', (threat) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('waf-threat', threat);
@@ -147,13 +150,12 @@ function initServices() {
       mainWindow.webContents.send('device-packet', packet);
       
       // Real-time WAF Inspection
-      if (packet.proto === 'HTTP' || packet.proto === 'DNS') {
-        const threat = wafManager.inspectRequest({
+      if (packet.proto === 'HTTP' || packet.proto === 'DNS' || packet.proto === 'HTTPS') {
+        wafManager.inspectRequest({
           url: packet.domain,
           sourceIp: 'Local Client',
-          payload: '' // tcpdump summary only
+          payload: ''
         });
-        // result is emitted via wafManager 'attack-detected' event
       }
     }
   });
@@ -165,22 +167,18 @@ function initServices() {
   });
 
   attackDetector.start(async (alert) => {
-    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('threat-alert', alert);
-    }
-
-    // Auto-mitigation logic: Block High/Critical IPs instantly
-    if ((alert.severity === 'high' || alert.severity === 'critical') && alert.sourceIP && !alert.mitigated) {
-       console.log(`[AUTO-MITIGATE] ${alert.title} from ${alert.sourceIP}. Blocking source...`);
-       const result = await firewallController.blockIP(alert.sourceIP);
-       if (result.success) {
-         alert.mitigated = true;
-         alert.mitigation = 'Aegis Sentinel Auto-Block';
-         // Notify UI of mitigation
-         if (mainWindow && !mainWindow.isDestroyed()) {
+      
+      // Auto-mitigation: Block High/Critical IPs instantly
+      if (alert.severity === 'high' || alert.severity === 'critical') {
+         const sourceIp = alert.sourceIp || (alert.details ? alert.details.match(/(\d+\.\d+\.\d+\.\d+)/)?.[1] : null);
+         if (sourceIp && sourceIp !== '127.0.0.1') {
+           console.log(`[AUTO-MITIGATE] ${alert.type} from ${sourceIp}. Blocking...`);
+           await firewallController.blockIP(sourceIp);
            mainWindow.webContents.send('threat-log-updated'); 
          }
-       }
+      }
     }
   });
 }
@@ -382,6 +380,7 @@ ipcMain.on('window-maximize', () => {
 ipcMain.on('window-close', () => { if (mainWindow) mainWindow.hide(); });
 
 app.whenReady().then(() => {
+  initServices();
   createWindow();
   setupTray();
 
