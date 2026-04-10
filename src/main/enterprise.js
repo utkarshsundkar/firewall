@@ -82,15 +82,28 @@ class EnterpriseManager {
   }
 
   // Called when this machine acts as an Agent and connects to the Admin
-  connectToAdmin(adminIp) {
+  connectToAdmin(connectStr) {
     this.mode = 'agent';
-    const numIp = adminIp.includes(':') ? adminIp : `${adminIp}:8080`;
     
+    // Normalize URL
+    let wsUrl = connectStr;
+    if (!wsUrl.includes('://')) {
+      wsUrl = `ws://${wsUrl}${wsUrl.includes(':') ? '' : ':8080'}`;
+    }
+
     try {
-      this.socket = new WebSocket(`ws://${numIp}`);
+      // Bypassing Localtunnel Interstitial Page
+      const options = {};
+      if (wsUrl.includes('.loca.lt')) {
+        options.headers = {
+          'Bypass-Tunnel-Reminder': 'true'
+        };
+      }
+
+      this.socket = new WebSocket(wsUrl, options);
       
       this.socket.on('open', () => {
-        this.mainWindow.webContents.send('enterprise-status', { connected: true, server: numIp });
+        this.mainWindow.webContents.send('enterprise-status', { connected: true, server: wsUrl });
         this.startAgentSync();
       });
 
