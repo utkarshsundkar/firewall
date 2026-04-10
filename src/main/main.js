@@ -308,6 +308,11 @@ ipcMain.handle('toggle-waf', async (event, enabled) => {
   return wafManager.toggle(enabled);
 });
 
+ipcMain.handle('reset-waf-scan', async () => {
+  if (trafficSniffer) trafficSniffer.seenConnections.clear();
+  return { success: true };
+});
+
 ipcMain.handle('block-ip', async (event, ip) => {
   return firewallController.blockIP(ip);
 });

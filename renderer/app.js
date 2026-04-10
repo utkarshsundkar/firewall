@@ -1435,6 +1435,19 @@ function initWafTab() {
     showToast('🚨 WAF Status', `Web Application Firewall is now ${toggle.checked ? 'ENABLED' : 'DISABLED'}.`, toggle.checked ? 'success' : 'high');
   });
 
+  // Refresh Scan — clears seen-connections cache so new traffic shows immediately
+  document.getElementById('waf-refresh-btn')?.addEventListener('click', async () => {
+    await window.aegis.resetWafScan();
+    showToast('🔄 WAF Refreshed', 'Scanning for new connections...', 'success');
+  });
+
+  // Clear — empties the table and resets counters
+  document.getElementById('waf-clear-btn')?.addEventListener('click', () => {
+    tbody.innerHTML = '<tr><td colspan="5" class="loading-td">Table cleared. Awaiting new traffic...</td></tr>';
+    wafInspectedCount = 0; wafBlockedCount = 0;
+    inspectedEl.textContent = '0'; blockedEl.textContent = '0';
+  });
+
   window.aegis.onWafThreat((threat) => {
     wafBlockedCount++;
     blockedEl.textContent = wafBlockedCount;

@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld('aegis', {
   // WAF
   getWafLog: () => ipcRenderer.invoke('get-waf-log'),
   toggleWaf: (enabled) => ipcRenderer.invoke('toggle-waf', enabled),
+  resetWafScan: () => ipcRenderer.invoke('reset-waf-scan'),
   
   // Real-time events
   onNetworkData: (callback) => ipcRenderer.on('network-data', (_, data) => callback(data)),

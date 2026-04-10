@@ -749,7 +749,11 @@
         <div class="card" style="padding:0; overflow:hidden; border:1px solid var(--border-light)">
            <div style="background:rgba(255,255,255,0.03); padding:12px 20px; border-bottom:1px solid var(--border-light); display:flex; justify-content:space-between; align-items:center">
               <h3 style="margin:0; font-size:14px">Live Application Traffic & Threat Inspection</h3>
-              <div style="font-size:11px; color:var(--text-muted)">Protocol: L7 HTTP/HTTPS/DNS</div>
+              <div style="display:flex; gap:10px; align-items:center">
+                <div style="font-size:11px; color:var(--text-muted)">Protocol: L7 HTTP/HTTPS/DNS</div>
+                <button id="waf-refresh-btn" class="btn-small" style="padding:5px 12px; font-size:11px; background:rgba(139,92,246,0.2); border:1px solid var(--accent); border-radius:6px; color:var(--accent); cursor:pointer">⟳ Refresh Scan</button>
+                <button id="waf-clear-btn" class="btn-small" style="padding:5px 12px; font-size:11px; background:rgba(255,255,255,0.05); border:1px solid var(--border-light); border-radius:6px; color:var(--text-muted); cursor:pointer">✕ Clear</button>
+              </div>
            </div>
            <div style="height: 600px; overflow-y: auto;">
               <table class="rules-table" style="margin:0">
