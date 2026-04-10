@@ -1324,7 +1324,7 @@ function initEnterpriseTab() {
         <td><span class="status-${isOnline ? 'online' : 'offline'}">${ag.status}</span></td>
         <td>
           <div class="dev-actions">
-            <!-- For hackathon, just a block command demonstration -->
+            <button class="dev-btn monitor-btn" onclick="openRemoteControl('${ag.id}')" ${!isOnline?'disabled':''}>⚙ Manage</button>
             <button class="dev-btn block-btn" onclick="window.aegis.entBlockAgent('${ag.id}', '0.0.0.0')" ${!isOnline?'disabled':''}>Lockdown</button>
           </div>
         </td>
@@ -1332,3 +1332,50 @@ function initEnterpriseTab() {
     }).join('');
   });
 }
+
+let activeRemoteAgent = null;
+
+function openRemoteControl(agentId) {
+  activeRemoteAgent = agentId;
+  const modal = document.getElementById('remote-control-modal');
+  modal.style.display = 'flex';
+  
+  // Find agent data to show hostname
+  // (Assuming we might have a state for agents, or we just rely on ID)
+  document.getElementById('rc-hostname').textContent = `Agent #${agentId.substring(0,6).toUpperCase()}`;
+
+  // Reset UI
+  document.getElementById('rc-fw-toggle').checked = true;
+}
+
+function closeRemoteControl() {
+  document.getElementById('remote-control-modal').style.display = 'none';
+  activeRemoteAgent = null;
+}
+
+// Remote Control Actions
+document.getElementById('rc-fw-toggle').addEventListener('change', (e) => {
+  if (!activeRemoteAgent) return;
+  window.aegis.entToggleFirewall(activeRemoteAgent, e.target.checked);
+  showToast('🏢 Remote Command', `Firewall ${e.target.checked ? 'Enabled' : 'Disabled'} on Agent`, 'medium');
+});
+
+async function remoteSetApp(appName, action) {
+  if (!activeRemoteAgent) return;
+  await window.aegis.entSetAppRule(activeRemoteAgent, appName, action);
+  showToast('🏢 Remote Command', `Policy set: Block ${appName} on Agent`, 'medium');
+}
+
+async function remoteBlockDomain() {
+  if (!activeRemoteAgent) return;
+  const domain = document.getElementById('rc-domain-input').value.trim();
+  if (!domain) return;
+  await window.aegis.entBlockWebsite(activeRemoteAgent, domain);
+  showToast('🏢 Remote Command', `Website ${domain} blocked on Agent`, 'medium');
+  document.getElementById('rc-domain-input').value = '';
+}
+
+window.openRemoteControl = openRemoteControl;
+window.closeRemoteControl = closeRemoteControl;
+window.remoteSetApp = remoteSetApp;
+window.remoteBlockDomain = remoteBlockDomain;

@@ -777,6 +777,51 @@
         </div>
       </section>
 
+      <!-- REMOTE CONTROL MODAL -->
+      <div class="modal-overlay" id="remote-control-modal" style="display: none; z-index: 1001;">
+        <div class="modal-box" style="width: 500px; max-width: 95%;">
+          <div class="modal-header">
+            <h3>Remote Management: <span id="rc-hostname">Device</span></h3>
+            <button class="modal-close" onclick="closeRemoteControl()">✕</button>
+          </div>
+          <div class="modal-body" style="padding: 20px;">
+            <div class="card" style="margin-bottom: 20px; background: var(--bg-input);">
+               <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <div style="font-weight:600; font-size:14px;">Main Firewall</div>
+                    <div style="font-size:12px; color:var(--text-secondary);">Enable/Disable remote packet filtering</div>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="rc-fw-toggle" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+               </div>
+            </div>
+
+            <div class="card" style="margin-bottom: 20px;">
+              <h4 style="margin-top:0; font-size:13px; color:var(--text-muted); text-transform:uppercase;">Application Access</h4>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="rc-app-list">
+                 <button class="btn-sm btn-secondary" onclick="remoteSetApp('Chrome', 'block')">🚫 Chrome</button>
+                 <button class="btn-sm btn-secondary" onclick="remoteSetApp('Discord', 'block')">🚫 Discord</button>
+                 <button class="btn-sm btn-secondary" onclick="remoteSetApp('Steam', 'block')">🚫 Steam</button>
+                 <button class="btn-sm btn-secondary" onclick="remoteSetApp('Spotify', 'block')">🚫 Spotify</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <h4 style="margin-top:0; font-size:13px; color:var(--text-muted); text-transform:uppercase;">Domain Restriction</h4>
+              <div class="form-group">
+                <input type="text" id="rc-domain-input" placeholder="Enter domain (e.g. facebook.com)" />
+              </div>
+              <button class="btn-danger full-width" onclick="remoteBlockDomain()">🚫 Block Website Remotely</button>
+            </div>
+          </div>
+          <div class="modal-footer" style="text-align: right;">
+            <button class="btn-secondary" onclick="closeRemoteControl()">Close Panel</button>
+          </div>
+        </div>
+      </div>
+
 
       <!-- DEVICE MONITOR MODAL -->
       <div class="modal-overlay" id="device-monitor-modal" style="display: none; z-index: 1000;">

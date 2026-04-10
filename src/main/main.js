@@ -84,7 +84,12 @@ function initServices() {
   websiteBlocker = new WebsiteBlocker();
   deviceManager  = new DeviceManager();
   trafficSniffer = new TrafficSniffer();
-  enterpriseManager = new EnterpriseManager(mainWindow, deviceManager);
+  enterpriseManager = new EnterpriseManager(mainWindow, {
+    deviceManager,
+    firewallController,
+    appController,
+    websiteBlocker
+  });
 
   // Start network monitoring - push data to renderer
   networkMonitor.start((data) => {
@@ -252,6 +257,18 @@ ipcMain.handle('enterprise:disconnect-agent', async () => {
 });
 ipcMain.handle('enterprise:block-agent', async (event, { agentId, targetIp }) => {
   enterpriseManager.sendCommandToAgent(agentId, 'EXEC_BLOCK', { targetIp });
+  return true;
+});
+ipcMain.handle('enterprise:toggle-firewall', async (event, { agentId, enabled }) => {
+  enterpriseManager.sendCommandToAgent(agentId, 'SET_FIREWALL_STATE', { enabled });
+  return true;
+});
+ipcMain.handle('enterprise:set-app-rule', async (event, { agentId, appName, action }) => {
+  enterpriseManager.sendCommandToAgent(agentId, 'SET_APP_RULE', { appName, action });
+  return true;
+});
+ipcMain.handle('enterprise:block-website', async (event, { agentId, domain }) => {
+  enterpriseManager.sendCommandToAgent(agentId, 'BLOCK_WEBSITE', { domain });
   return true;
 });
 

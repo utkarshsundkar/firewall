@@ -3,9 +3,12 @@ const os = require('os');
 const { app } = require('electron');
 
 class EnterpriseManager {
-  constructor(mainWindow, deviceManager) {
+  constructor(mainWindow, services) {
     this.mainWindow = mainWindow;
-    this.deviceManager = deviceManager;
+    this.deviceManager = services.deviceManager;
+    this.firewallController = services.firewallController;
+    this.appController = services.appController;
+    this.websiteBlocker = services.websiteBlocker;
     
     this.mode = 'standalone'; // 'standalone', 'server', 'agent'
     this.server = null;
@@ -76,7 +79,7 @@ class EnterpriseManager {
         this.startAgentSync();
       });
 
-      this.socket.on('message', (data) => {
+      this.socket.on('message', async (data) => {
         try {
           const msg = JSON.parse(data);
           if (msg.type === 'HANDSHAKE_REQ') {
@@ -88,8 +91,20 @@ class EnterpriseManager {
           } else if (msg.type === 'EXEC_BLOCK') {
              // Admin told us to block an IP locally
              this.deviceManager.addBlockRule(msg.targetIp, 'Admin command');
+          } else if (msg.type === 'SET_FIREWALL_STATE') {
+             // Admin toggling firewall
+             await this.firewallController.toggle(msg.enabled);
+          } else if (msg.type === 'SET_APP_RULE') {
+             // Admin setting app rule
+             await this.appController.setRule(msg.appName, msg.action);
+             await this.websiteBlocker.blockAppDomains(msg.appName, msg.action);
+          } else if (msg.type === 'BLOCK_WEBSITE') {
+             // Admin blocking website
+             await this.websiteBlocker.blockDomain(msg.domain, 'Admin Remote Block');
           }
-        } catch (e) {}
+        } catch (e) {
+          console.error('Agent message error:', e);
+        }
       });
 
       this.socket.on('close', () => {
