@@ -58,11 +58,25 @@ function createWindow() {
 
 function checkAuthorization() {
   if (process.platform === 'darwin') {
-    const cmd = "echo 'Aegis Security Authorized'";
-    const osa = `osascript -e 'do shell script "${cmd}" with administrator privileges'`;
+    // Combine all root-level setup into ONE script so it only asks ONCE
+    const setupScript = [
+      'chmod 666 /etc/hosts',             // Allow Aegis to manage websites without re-prompting
+      'pfctl -E',                         // Enable PF firewall
+      'echo "set block-policy drop" | pfctl -ef -', // Set default policy
+      'touch /tmp/aegis_authorized'       // Persistence marker
+    ].join(' && ');
+
+    const osa = `osascript -e 'do shell script "${setupScript}" with administrator privileges'`;
+    
     exec(osa, (err) => {
-      if (err) console.log('Initial auth cancelled or failed');
-      else console.log('Aegis authorized');
+      if (err) {
+        console.log('Final auth cancelled or failed');
+        if (mainWindow) {
+           mainWindow.webContents.send('enterprise-client-status', { connected: false, error: 'Authorization required for full protection.' });
+        }
+      } else {
+        console.log('Aegis fully authorized for session');
+      }
     });
   }
 }

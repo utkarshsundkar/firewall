@@ -94,54 +94,30 @@ class WebsiteBlocker {
     }
 
     const newContent = base.trimEnd() + '\n' + this._buildAegisBlock();
-    const tmpPath = path.join(os.tmpdir(), 'aegis_hosts_tmp.txt');
-
-    try {
-      fs.writeFileSync(tmpPath, newContent, 'utf8');
-    } catch (e) {
-      return callback(new Error('Failed to write temp file: ' + e.message));
-    }
-
-    // First try a direct write (works if already running as root/admin)
+    
+    // Direct attempt — this should work after the Startup Auth (chmod 666)
     try {
       fs.writeFileSync(HOSTS_PATH, newContent, 'utf8');
       this._flushDNS(() => callback(null));
       return;
-    } catch (directErr) {
-      // Need elevation — fall through
+    } catch (err) {
+      console.log('Direct hosts write failed, falling back to prompt...', err.message);
     }
 
+    const tmpPath = path.join(os.tmpdir(), 'aegis_hosts_tmp.txt');
+    try { fs.writeFileSync(tmpPath, newContent, 'utf8'); } catch(e) {}
+
     if (process.platform === 'win32') {
-      // Windows: PowerShell with UAC elevation via Start-Process -Verb RunAs
       const psScript = `Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile -Command "Copy-Item ''${tmpPath.replace(/\\/g, '\\\\')}'' ''${HOSTS_PATH}'' -Force; ipconfig /flushdns"' -Wait`;
-      exec(`powershell -NoProfile -Command "${psScript}"`, { timeout: 30000 }, (err) => {
-        callback(err);
-      });
+      exec(`powershell -NoProfile -Command "${psScript}"`, { timeout: 30000 }, (err) => callback(err));
     } else {
-      // macOS/Linux: osascript triggers native macOS password dialog — no Terminal needed
-      const escapedTmp  = tmpPath.replace(/"/g, '\\"');
-      const escapedDest = HOSTS_PATH.replace(/"/g, '\\"');
       const shellScript = [
-        `cp \\"${escapedTmp}\\" \\"${escapedDest}\\"`,
+        `cp \\"${tmpPath}\\" \\"${HOSTS_PATH}\\"`,
         `dscacheutil -flushcache`,
         `killall -HUP mDNSResponder 2>/dev/null || true`
       ].join(' && ');
-
-      // osascript do shell script with administrator privileges
-      // This triggers the system native auth dialog (Touch ID or password)
       const osaCmd = `osascript -e 'do shell script "${shellScript}" with administrator privileges'`;
-
-      exec(osaCmd, { timeout: 30000 }, (err, stdout, stderr) => {
-        if (err) {
-          // User cancelled the auth dialog or osascript unavailable
-          console.log('osascript auth failed (user may have cancelled):', err.message);
-          callback(new Error(
-            `Admin access required. Run manually: sudo cp ${tmpPath} ${HOSTS_PATH} && sudo dscacheutil -flushcache`
-          ));
-        } else {
-          callback(null);
-        }
-      });
+      exec(osaCmd, { timeout: 30000 }, (err) => callback(err));
     }
   }
 
