@@ -23,14 +23,13 @@ const APP_DOMAINS = {
   'Spotify':      ['spotify.com', 'spclient.wg.spotify.com', 'apresolve.spotify.com', 'audio-ec.spotify.com'],
   'Slack':        ['slack.com', 'api.slack.com', 'files.slack.com', 'wss-primary.slack.com'],
   'Zoom':         ['zoom.us', 'zoomgov.com', 'zmtrack.net'],
-  'Dropbox':      ['dropbox.com', 'dropboxapi.com', 'dropboxusercontent.com'],
-  'TeamViewer':   ['teamviewer.com', 'router.teamviewer.com'],
-  'BitTorrent':   ['bittorrent.com', 'tracker.bittorrent.com'],
-  'Tor Browser':  ['torproject.org'],
-  'Chrome':       [], // Don't block Chrome entirely – use website blocker instead
-  'Safari':       [],
-  'VLC':          [],
-  'Terminal':     [],
+  'Steam':        ['steampowered.com', 'steamcommunity.com', 'steamstatic.com'],
+  'VS Code':      ['vscode.dev', 'update.code.visualstudio.com'],
+  'Chrome':       ['google.com', 'google-analytics.com'],
+  'Brave':        ['brave.com', 'basicattentiontoken.org'],
+  'Safari':       ['apple.com', 'icloud.com'],
+  'Docker':       ['docker.com', 'docker.io'],
+  'Postman':      ['postman.com', 'getpostman.com'],
 };
 
 class WebsiteBlocker {

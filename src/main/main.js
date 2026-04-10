@@ -71,9 +71,9 @@ function checkAuthorization() {
     });
   } else if (process.platform === 'win32') {
     // Windows: Unlock hosts file for direct access and verify firewall
-    // Granting 'Everyone' full access temporarily to allow Aegis to manage blocks
+    // Stripping read-only attribute and granting 'Everyone' full access
     const hostsPath = 'C:\\Windows\\System32\\drivers\\etc\\hosts';
-    const psCommand = `icacls \\"${hostsPath}\\" /grant Everyone:F; netsh advfirewall set allprofiles state on`;
+    const psCommand = `attrib -R \\"${hostsPath}\\"; icacls \\"${hostsPath}\\" /grant Everyone:F; netsh advfirewall set allprofiles state on`;
     const psScript = `Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile -Command "${psCommand}"' -Wait`;
     exec(`powershell -NoProfile -Command "${psScript}"`, (err) => {
       if (!err) console.log('Aegis Windows Authorized');
