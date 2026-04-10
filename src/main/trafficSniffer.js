@@ -1,175 +1,154 @@
-const { exec, spawn } = require('child_process');
-const fs = require('fs');
+const { exec } = require('child_process');
 const dns = require('dns');
 
+/**
+ * TrafficSniffer - Uses `lsof` to poll active network connections
+ * Works without root, sees ALL connections (HTTP, HTTPS, DoH, DoT, etc.)
+ */
 class TrafficSniffer {
   constructor() {
-    this.tailProcess = null;
-    this.logFile = `/tmp/aegis_sniff_${Date.now()}.log`;
+    this.pollInterval = null;
     this.ipCache = {};
+    this.seenConnections = new Set(); // Avoid re-showing same connections
+    this.targetIp = null;
   }
 
-  async start(targetIp, callback) {
+  start(targetIp, callback) {
     this.stop();
-    
-    // ensure log file exists and is writable
-    try { fs.writeFileSync(this.logFile, ''); } catch(e){ console.error("Log init failed", e); }
+    this.targetIp = targetIp;
+    this.callback = callback;
 
-    if (process.platform === 'darwin') {
-      let iface = 'any'; // Listen on all interfaces (including bridge100 for internet sharing)
+    console.log('[TrafficSniffer] Starting lsof-based connection monitor...');
 
-      // Write a shell script to disk and execute it — avoids all quoting/escaping issues
-      const scriptPath = `/tmp/aegis_capture_${Date.now()}.sh`;
-      const filter = targetIp ? `host ${targetIp} and \\( port 53 or port 80 or port 443 \\)` : `port 53 or port 80 or port 443`;
-      const scriptContent = `#!/bin/bash\ntcpdump -l -i any -n ${filter} > "${this.logFile}" 2>/dev/null &\n`;
-      
-      try { fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 }); } catch(e) { console.error('Script write failed', e); }
-      
-      const osa = `osascript -e 'do shell script "bash ${scriptPath}" with administrator privileges'`;
-      
-      console.log("[TrafficSniffer] Requesting admin privileges for tcpdump...");
-      exec(osa, { timeout: 30000 }, (err) => {
-        if (err && err.signal !== 'SIGTERM') {
-            console.error("TrafficSniffer: Auth failed", err.message);
-            callback({ proto: 'SYS', method: 'ERR', domain: 'Capture auth failed — accept the admin prompt.', time: new Date().toLocaleTimeString('en-US', {hour12:false}) });
-        } else {
-            console.log("[TrafficSniffer] Capture started successfully.");
-        }
-        try { fs.unlinkSync(scriptPath); } catch(e) {}
-      });
-      
-      // 2) Start tailing the dump file after a short delay
-      setTimeout(() => {
-        this.tailProcess = spawn('tail', ['-f', this.logFile]);
-        let buffer = '';
+    // Poll every 2 seconds using lsof
+    this.pollInterval = setInterval(() => {
+      this._pollConnections();
+    }, 2000);
 
-        this.tailProcess.stdout.on('data', async (data) => {
-          buffer += data.toString();
-          let lines = buffer.split('\n');
-          buffer = lines.pop(); // keep last incomplete line
-          
-          for (let line of lines) {
-             const parsed = await this.parseLine(line, targetIp);
-             if (parsed) callback(parsed);
-          }
-        });
-      }, 2000);
-
-      
-    } else {
-        // Mock fallback for non-mac environments
-        setInterval(() => {
-            callback({ proto: 'SYS', method: 'N/A', domain: 'Windows packet capture requires Npcap (not installed).', time: new Date().toLocaleTimeString('en-US', {hour12:false}) });
-        }, 5000);
-    }
+    // First poll immediately
+    setTimeout(() => this._pollConnections(), 500);
   }
 
-  async parseLine(line, targetIp) {
-    line = line.trim();
-    if (!line || line.includes('tcpdump: ')) return null;
+  _pollConnections() {
+    const cmd = `lsof -i tcp -n -P 2>/dev/null | grep -E 'ESTABLISHED|SYN_SENT'`;
+    exec(cmd, { timeout: 5000 }, async (err, stdout) => {
+      if (err || !stdout) return;
 
-    // Pattern: 14:03:32.123456 IP 192.168.1.5.54321 > 8.8.8.8.53: 1234+ A? google.com. (28)
-    const timeMatch = line.match(/^(\d{2}:\d{2}:\d{2})\.\d+/);
-    if (!timeMatch) return null;
-    const time = timeMatch[1];
+      const lines = stdout.trim().split('\n');
+      const now = new Date().toLocaleTimeString('en-US', { hour12: false });
 
-    // Check for DNS query (Port 53)
-    if (line.includes('.53: ') || line.includes(' A? ') || line.includes(' AAAA? ')) {
-       const match = line.match(/A\??\s+([a-zA-Z0-9.-]+)\./);
-       if (match) {
-           return { proto: 'DNS', method: 'Query', domain: match[1], time };
-       }
-    }
+      for (const line of lines) {
+        try {
+          // lsof format: COMMAND   PID   USER   FD   TYPE   DEVICE   SIZE   NODE   NAME
+          // NAME is like: 192.168.1.5:55234->142.250.68.142:443 (ESTABLISHED)
+          const nameMatch = line.match(/(\d+\.\d+\.\d+\.\d+):(\d+)->(\d+\.\d+\.\d+\.\d+):(\d+)/);
+          if (!nameMatch) continue;
 
-    // Check for HTTP/HTTPS outward packets 
-    // Generic match: IP [ANY] > [ANY].[PORT]:
-    if (line.includes(' > ')) {
-        const parts = line.split(' > ');
-        if (parts.length < 2) return null;
-        
-        // Match destination IP and port from the second part
-        const dstMatch = parts[1].match(/^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\.(\d+):/);
-        if (dstMatch) {
-            const dstIp = dstMatch[1];
-            const port = dstMatch[2];
-            
-            if (port === '443') {
-                return { proto: 'HTTPS', method: 'TLS', domain: await this.resolveIp(dstIp), time };
-            } else if (port === '80') {
-                return { proto: 'HTTP', method: 'GET', domain: await this.resolveIp(dstIp), time };
-            }
-        }
-    }
+          const srcIp = nameMatch[1];
+          const dstIp = nameMatch[3];
+          const dstPort = nameMatch[4];
 
-    return null;
-  }
-  
-  resolveIp(ip) {
-      if (this.ipCache[ip]) return Promise.resolve(this.ipCache[ip]);
-      
-      // Known popular IP blocks — broad ranges for major services
-      const commonSites = {
-          '216.239.': 'google.com',
-          '172.217.': 'google.com',
-          '142.250.': 'google.com',
-          '74.125.': 'google.com',
-          '64.233.': 'google.com',
-          '66.102.': 'google.com',
-          '17.': 'apple.com',
-          '23.': 'akamai.net',
-          '72.21.': 'amazon-cdn.net',
-          '54.': 'amazonaws.com',
-          '151.101.': 'fastly.net',
-          '104.16.': 'cloudflare.com',
-          '104.17.': 'cloudflare.com',
-          '104.18.': 'cloudflare.com',
-          '104.19.': 'cloudflare.com',
-          '185.199.': 'github.io',
-          '140.82.': 'github.com',
-          '13.107.': 'microsoft.com',
-          '52.112.': 'microsoft.com',
-          '20.': 'azure.microsoft.com',
-          '157.240.': 'facebook.com',
-          '31.13.': 'facebook.com',
-          '8.8.': 'dns.google',
-          '1.1.': 'cloudflare-dns.com',
-          '34.': 'google-cloud.com',
-          '35.': 'google-cloud.com',
-      };
+          // Filter to only outbound connections (not loopback)
+          if (dstIp === '127.0.0.1' || dstIp === '::1') continue;
+          if (this.targetIp && srcIp !== this.targetIp && dstIp !== this.targetIp) continue;
 
-      for (let prefix in commonSites) {
-          if (ip.startsWith(prefix)) {
-              this.ipCache[ip] = commonSites[prefix];
-              return Promise.resolve(commonSites[prefix]);
+          const connKey = `${srcIp}:${nameMatch[2]}->${dstIp}:${dstPort}`;
+          if (this.seenConnections.has(connKey)) continue;
+          this.seenConnections.add(connKey);
+
+          // Cap seen set size
+          if (this.seenConnections.size > 500) {
+            // Clear oldest entries
+            const iter = this.seenConnections.values();
+            for (let i = 0; i < 100; i++) this.seenConnections.delete(iter.next().value);
           }
+
+          const domain = await this.resolveIp(dstIp);
+          let proto = 'TCP';
+          let method = `PORT ${dstPort}`;
+
+          if (dstPort === '443') { proto = 'HTTPS'; method = 'TLS'; }
+          else if (dstPort === '80') { proto = 'HTTP'; method = 'GET'; }
+          else if (dstPort === '53') { proto = 'DNS'; method = 'Query'; }
+
+          this.callback({ proto, method, domain, sourceIp: srcIp, time: now });
+        } catch (e) { /* skip malformed lines */ }
       }
+    });
+  }
 
-      return new Promise((resolve) => {
-          dns.reverse(ip, (err, hostnames) => {
-              if (!err && hostnames && hostnames.length > 0) {
-                  let name = hostnames[0].replace(/\.$/, '');
-                  // Clean up generic CDN names to be more readable
-                  if (name.includes('1e100.net')) name = 'google.services';
-                  if (name.includes('deploy.static.akamaitechnologies.com')) name = 'akamai.cdn';
-                  
-                  this.ipCache[ip] = name;
-                  resolve(name);
-              } else {
-                  this.ipCache[ip] = ip;
-                  resolve(ip);
-              }
-          });
+  resolveIp(ip) {
+    if (this.ipCache[ip]) return Promise.resolve(this.ipCache[ip]);
+
+    // Comprehensive hostname map — sorted by specificity (longer prefixes first)
+    const knownHosts = [
+      // YouTube / Google Video
+      ['208.117.', 'youtube.com'], ['74.125.', 'youtube.com'],
+      ['172.217.', 'youtube.com'], ['216.239.', 'google.com'],
+      ['142.250.', 'google.com'], ['64.233.', 'google.com'],
+      ['66.102.', 'google.com'], ['34.', 'google-cloud.com'],
+      ['35.', 'google-cloud.com'],
+      // Apple
+      ['17.', 'apple.com'],
+      // Discord
+      ['162.159.', 'discord.com'], ['104.16.', 'discord.com'],
+      ['104.17.', 'discord.com'], ['104.18.', 'cloudflare.com'],
+      ['104.19.', 'cloudflare.com'], ['104.20.', 'cloudflare.com'],
+      ['104.21.', 'cloudflare.com'],
+      // Cloudflare DNS
+      ['1.1.1.', 'cloudflare-dns.com'], ['1.0.0.', 'cloudflare-dns.com'],
+      // Facebook / Instagram / WhatsApp
+      ['157.240.', 'instagram.com'], ['31.13.', 'facebook.com'],
+      ['69.171.', 'facebook.com'],
+      // Microsoft
+      ['13.107.', 'microsoft.com'], ['52.112.', 'teams.microsoft.com'],
+      ['20.', 'azure.microsoft.com'],
+      // Amazon / AWS
+      ['54.', 'amazonaws.com'], ['52.', 'amazonaws.com'],
+      ['3.', 'aws.amazon.com'], ['72.21.', 'amazon.com'],
+      // GitHub
+      ['185.199.', 'github.io'], ['140.82.', 'github.com'],
+      // Fastly CDN
+      ['151.101.', 'fastly.net'],
+      // Akamai
+      ['23.', 'akamai.net'], ['2.16.', 'akamai.net'],
+      // Google DNS
+      ['8.8.', 'dns.google'],
+    ];
+
+    for (const [prefix, host] of knownHosts) {
+      if (ip.startsWith(prefix)) {
+        this.ipCache[ip] = host;
+        return Promise.resolve(host);
+      }
+    }
+
+    // Fallback: Try reverse DNS
+    return new Promise((resolve) => {
+      dns.reverse(ip, (err, hostnames) => {
+        if (!err && hostnames && hostnames.length > 0) {
+          let name = hostnames[0].replace(/\.$/, '');
+          // Simplify generic names
+          if (name.includes('1e100.net')) name = 'google.com';
+          if (name.includes('akamaitechnologies')) name = 'akamai.net';
+          if (name.includes('googleusercontent')) name = 'googleusercontent.com';
+          this.ipCache[ip] = name;
+          resolve(name);
+        } else {
+          this.ipCache[ip] = ip;
+          resolve(ip);
+        }
       });
+    });
   }
 
   stop() {
-    if (this.tailProcess) {
-      this.tailProcess.kill();
-      this.tailProcess = null;
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
     }
-    if (process.platform === 'darwin') {
-      exec(`osascript -e 'do shell script "pkill -f tcpdump" with administrator privileges'`);
-    }
+    this.seenConnections.clear();
   }
 }
+
 module.exports = TrafficSniffer;
