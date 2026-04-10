@@ -158,18 +158,23 @@ class EnterpriseManager {
       this.broadcastAgents();
     }
     else if (payload.type === 'PACKET_LOG') {
-      // Forward this packet log to the Admin UI
-      this.mainWindow.webContents.send('enterprise-agent-packet', { agentId, packet: payload.packet });
+      this.safeSend('enterprise-agent-packet', { agentId, packet: payload.packet });
     }
     else if (payload.type === 'FULL_STATE_UPDATE') {
-      this.mainWindow.webContents.send('enterprise-agent-state', { agentId, state: payload });
+      this.safeSend('enterprise-agent-state', { agentId, state: payload });
     }
   }
 
   broadcastAgents() {
     if (this.mode !== 'server') return;
     const array = Array.from(this.agents.values()).map(a => a.data);
-    this.mainWindow.webContents.send('enterprise-agents-updated', array);
+    this.safeSend('enterprise-agents-updated', array);
+  }
+
+  safeSend(channel, data) {
+    if (this.mainWindow && !this.mainWindow.isDestroyed() && !this.mainWindow.webContents.isDestroyed()) {
+        try { this.mainWindow.webContents.send(channel, data); } catch(e) {}
+    }
   }
 
   // Admin sending a command to an agent

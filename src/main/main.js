@@ -106,13 +106,13 @@ function initServices() {
 
   // Start network monitoring - push data to renderer
   networkMonitor.start((data) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
       mainWindow.webContents.send('network-data', data);
     }
   });
 
   attackDetector.start((alert) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
       mainWindow.webContents.send('threat-alert', alert);
     }
   });
