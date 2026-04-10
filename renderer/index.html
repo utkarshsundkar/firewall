@@ -777,47 +777,100 @@
         </div>
       </section>
 
-      <!-- REMOTE CONTROL MODAL -->
+      <!-- REMOTE CONTROL MODAL (EXPANDED) -->
       <div class="modal-overlay" id="remote-control-modal" style="display: none; z-index: 1001;">
-        <div class="modal-box" style="width: 500px; max-width: 95%;">
-          <div class="modal-header">
-            <h3>Remote Management: <span id="rc-hostname">Device</span></h3>
-            <button class="modal-close" onclick="closeRemoteControl()">✕</button>
+        <div class="modal-box" style="width: 1000px; max-width: 95%; height: 85vh; display: flex; flex-direction: column; padding: 0;">
+          <div class="modal-header" style="background: var(--bg-surface); padding: 16px 24px; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+               <div style="width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green);"></div>
+               <h3 style="margin: 0; font-size: 16px;">Remote Management &mdash; <span id="rc-hostname">Device</span></h3>
+            </div>
+            <button class="modal-close" style="position: static;" onclick="closeRemoteControl()">✕</button>
           </div>
-          <div class="modal-body" style="padding: 20px;">
-            <div class="card" style="margin-bottom: 20px; background: var(--bg-input);">
-               <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <div>
-                    <div style="font-weight:600; font-size:14px;">Main Firewall</div>
-                    <div style="font-size:12px; color:var(--text-secondary);">Enable/Disable remote packet filtering</div>
+          
+          <div style="display: flex; flex: 1; overflow: hidden;">
+            <!-- Left Tab Nav -->
+            <div style="width: 200px; background: var(--bg-elevated); border-right: 1px solid var(--border-light); padding: 12px;">
+              <div class="rc-nav-item active" onclick="switchRCTab('dashboard')">📊 Dashboard</div>
+              <div class="rc-nav-item" onclick="switchRCTab('firewall')">🛡️ Firewall Rules</div>
+              <div class="rc-nav-item" onclick="switchRCTab('apps')">📱 App Control</div>
+              <div class="rc-nav-item" onclick="switchRCTab('web')">🌐 Web Blocker</div>
+              <div class="rc-nav-item" onclick="switchRCTab('logs')">📋 Threat Logs</div>
+            </div>
+
+            <!-- Right Content Area -->
+            <div style="flex: 1; overflow-y: auto; padding: 24px; background: var(--bg-base);" id="rc-content">
+               
+               <!-- RC DASHBOARD -->
+               <div id="rc-tab-dashboard" class="rc-tab-content">
+                  <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 24px;">
+                     <div class="kpi-card">
+                       <div class="kpi-value" id="rc-kpi-load">-</div>
+                       <div class="kpi-label">CPU Load</div>
+                     </div>
+                     <div class="kpi-card">
+                       <div class="kpi-value" id="rc-kpi-mem">-</div>
+                       <div class="kpi-label">Free Memory</div>
+                     </div>
+                     <div class="kpi-card">
+                       <div class="kpi-value" id="rc-kpi-fw">OFF</div>
+                       <div class="kpi-label">Firewall Status</div>
+                     </div>
                   </div>
-                  <label class="toggle-switch">
-                    <input type="checkbox" id="rc-fw-toggle" checked />
-                    <span class="toggle-slider"></span>
-                  </label>
+                  
+                  <div class="card" style="background: var(--bg-input);">
+                     <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                          <h4 style="margin:0 0 4px 0">Remote Firewall Master Switch</h4>
+                          <p style="margin:0; font-size:12px; color:var(--text-secondary)">Globally enable/disable Aegis on this agent.</p>
+                        </div>
+                        <label class="toggle-switch">
+                          <input type="checkbox" id="rc-fw-toggle-global" />
+                          <span class="toggle-slider"></span>
+                        </label>
+                     </div>
+                  </div>
                </div>
-            </div>
 
-            <div class="card" style="margin-bottom: 20px;">
-              <h4 style="margin-top:0; font-size:13px; color:var(--text-muted); text-transform:uppercase;">Application Access</h4>
-              <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="rc-app-list">
-                 <button class="btn-sm btn-secondary" onclick="remoteSetApp('Chrome', 'block')">🚫 Chrome</button>
-                 <button class="btn-sm btn-secondary" onclick="remoteSetApp('Discord', 'block')">🚫 Discord</button>
-                 <button class="btn-sm btn-secondary" onclick="remoteSetApp('Steam', 'block')">🚫 Steam</button>
-                 <button class="btn-sm btn-secondary" onclick="remoteSetApp('Spotify', 'block')">🚫 Spotify</button>
-              </div>
-            </div>
+               <!-- RC FIREWALL -->
+               <div id="rc-tab-firewall" class="rc-tab-content" style="display: none;">
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
+                    <h3 style="margin:0">Active Firewall Rules</h3>
+                  </div>
+                  <table class="rules-table">
+                    <thead><tr><th>Rule</th><th>Port</th><th>Direction</th><th>Action</th></tr></thead>
+                    <tbody id="rc-firewall-tbody"></tbody>
+                  </table>
+               </div>
 
-            <div class="card">
-              <h4 style="margin-top:0; font-size:13px; color:var(--text-muted); text-transform:uppercase;">Domain Restriction</h4>
-              <div class="form-group">
-                <input type="text" id="rc-domain-input" placeholder="Enter domain (e.g. facebook.com)" />
-              </div>
-              <button class="btn-danger full-width" onclick="remoteBlockDomain()">🚫 Block Website Remotely</button>
+               <!-- RC APPS -->
+               <div id="rc-tab-apps" class="rc-tab-content" style="display: none;">
+                  <h3>Managed Applications</h3>
+                  <div id="rc-app-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;"></div>
+               </div>
+
+               <!-- RC WEB -->
+               <div id="rc-tab-web" class="rc-tab-content" style="display: none;">
+                  <h3>Website Blocking</h3>
+                  <div class="form-group" style="display: flex; gap: 8px;">
+                     <input type="text" id="rc-web-input" style="flex:1" placeholder="Enter domain to block..." />
+                     <button class="btn-danger" onclick="remoteBlockDomain()">Block</button>
+                  </div>
+                  <div class="wb-list" id="rc-web-list" style="margin-top: 16px;"></div>
+               </div>
+
+               <!-- RC LOGS -->
+               <div id="rc-tab-logs" class="rc-tab-content" style="display: none;">
+                  <h3>Remote Threat History</h3>
+                  <div class="threats-container" id="rc-logs-container"></div>
+               </div>
+
             </div>
           </div>
-          <div class="modal-footer" style="text-align: right;">
-            <button class="btn-secondary" onclick="closeRemoteControl()">Close Panel</button>
+
+          <div class="modal-footer" style="background: var(--bg-surface); border-top: 1px solid var(--border-light); padding: 12px 24px; text-align: right;">
+             <button class="btn-secondary" onclick="window.aegis.entRequestFullState(activeRemoteAgent)">↺ Refresh Data</button>
+             <button class="btn-secondary" onclick="closeRemoteControl()">Finish Session</button>
           </div>
         </div>
       </div>

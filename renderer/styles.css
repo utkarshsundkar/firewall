@@ -1025,3 +1025,56 @@ input::placeholder { color: var(--text-muted); }
   width: 100%;
   text-align: center;
 }
+/* ═══════════ REMOTE CONTROL PANEL ═══════════ */
+.rc-nav-item {
+  padding: 12px 14px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rc-nav-item:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+.rc-nav-item.active {
+  background: var(--bg-base);
+  color: var(--accent-light);
+  border-left: 3px solid var(--accent);
+  padding-left: 11px;
+}
+
+.rc-tab-content {
+  animation: fadeIn 0.2s ease;
+}
+
+.rc-app-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.rc-app-card h4 { margin: 0; font-size: 14px; }
+.rc-app-card p { margin: 2px 0 0 0; font-size: 11px; color: var(--text-muted); }
+
+.rc-web-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+.rc-web-domain { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; }
+.rc-web-action { font-size: 11px; color: var(--red); font-weight: 700; cursor: pointer; }

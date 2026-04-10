@@ -88,19 +88,30 @@ class EnterpriseManager {
                 hostname: os.hostname(),
                 os: os.platform() + ' ' + os.release()
              }));
+          } else if (msg.type === 'REQUEST_FULL_STATE') {
+             // Admin wants to see everything
+             const state = {
+               type: 'FULL_STATE_UPDATE',
+               firewallRules: await this.firewallController.getRules(),
+               appRules: await this.appController.getAppRules(),
+               blockedWebsites: await this.websiteBlocker.getBlockedList(),
+               connections: [], // Optimization: only if specifically requested maybe? Let's just send a snapshot.
+               stats: { load: os.loadavg()[0], freeMem: os.freemem(), platform: os.platform() }
+             };
+             this.socket.send(JSON.stringify(state));
           } else if (msg.type === 'EXEC_BLOCK') {
-             // Admin told us to block an IP locally
              this.deviceManager.addBlockRule(msg.targetIp, 'Admin command');
           } else if (msg.type === 'SET_FIREWALL_STATE') {
-             // Admin toggling firewall
              await this.firewallController.toggle(msg.enabled);
+             // Trigger a refresh
+             this.socket.send(JSON.stringify({ type: 'FULL_STATE_UPDATE', firewallRules: await this.firewallController.getRules() }));
           } else if (msg.type === 'SET_APP_RULE') {
-             // Admin setting app rule
              await this.appController.setRule(msg.appName, msg.action);
              await this.websiteBlocker.blockAppDomains(msg.appName, msg.action);
+             this.socket.send(JSON.stringify({ type: 'FULL_STATE_UPDATE', appRules: await this.appController.getAppRules() }));
           } else if (msg.type === 'BLOCK_WEBSITE') {
-             // Admin blocking website
              await this.websiteBlocker.blockDomain(msg.domain, 'Admin Remote Block');
+             this.socket.send(JSON.stringify({ type: 'FULL_STATE_UPDATE', blockedWebsites: await this.websiteBlocker.getBlockedList() }));
           }
         } catch (e) {
           console.error('Agent message error:', e);
@@ -149,6 +160,9 @@ class EnterpriseManager {
     else if (payload.type === 'PACKET_LOG') {
       // Forward this packet log to the Admin UI
       this.mainWindow.webContents.send('enterprise-agent-packet', { agentId, packet: payload.packet });
+    }
+    else if (payload.type === 'FULL_STATE_UPDATE') {
+      this.mainWindow.webContents.send('enterprise-agent-state', { agentId, state: payload });
     }
   }
 

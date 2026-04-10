@@ -271,6 +271,10 @@ ipcMain.handle('enterprise:block-website', async (event, { agentId, domain }) =>
   enterpriseManager.sendCommandToAgent(agentId, 'BLOCK_WEBSITE', { domain });
   return true;
 });
+ipcMain.handle('enterprise:request-full-state', async (event, agentId) => {
+  enterpriseManager.sendCommandToAgent(agentId, 'REQUEST_FULL_STATE', {});
+  return true;
+});
 
 ipcMain.on('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.on('window-maximize', () => {

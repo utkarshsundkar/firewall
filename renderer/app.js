@@ -1340,12 +1340,26 @@ function openRemoteControl(agentId) {
   const modal = document.getElementById('remote-control-modal');
   modal.style.display = 'flex';
   
-  // Find agent data to show hostname
-  // (Assuming we might have a state for agents, or we just rely on ID)
   document.getElementById('rc-hostname').textContent = `Agent #${agentId.substring(0,6).toUpperCase()}`;
+  
+  // Request fresh data from agent
+  window.aegis.entRequestFullState(agentId);
+  showToast('📦 Fetching Data', 'Requesting full configuration from agent...', 'info');
+  
+  // Default to dashboard
+  switchRCTab('dashboard');
+}
 
-  // Reset UI
-  document.getElementById('rc-fw-toggle').checked = true;
+function switchRCTab(tabName) {
+  // Update nav UI
+  document.querySelectorAll('.rc-nav-item').forEach(el => {
+    el.classList.toggle('active', el.textContent.toLowerCase().includes(tabName));
+  });
+  
+  // Update content UI
+  document.querySelectorAll('.rc-tab-content').forEach(el => {
+    el.style.display = el.id === `rc-tab-${tabName}` ? 'block' : 'none';
+  });
 }
 
 function closeRemoteControl() {
@@ -1353,29 +1367,92 @@ function closeRemoteControl() {
   activeRemoteAgent = null;
 }
 
-// Remote Control Actions
-document.getElementById('rc-fw-toggle').addEventListener('change', (e) => {
+// Global listeners for incoming Agent State
+window.aegis.onEntAgentState(({ agentId, state }) => {
+  if (activeRemoteAgent !== agentId) return;
+
+  // 1. Dashboard / KPIs
+  if (state.stats) {
+    document.getElementById('rc-kpi-load').textContent = `${(state.stats.load * 10).toFixed(1)}%`;
+    document.getElementById('rc-kpi-mem').textContent = formatBytes(state.stats.freeMem, 1);
+  }
+
+  // 2. Firewall Rules
+  if (state.firewallRules) {
+    const tbody = document.getElementById('rc-firewall-tbody');
+    tbody.innerHTML = state.firewallRules.map(rule => `
+      <tr>
+        <td style="font-weight:600">${rule.name}</td>
+        <td><code style="color:var(--text-mono)">${rule.port || '*'}</code></td>
+        <td><span class="pill pill-out">${rule.direction}</span></td>
+        <td><span class="action-${rule.action}">${rule.action.toUpperCase()}</span></td>
+      </tr>
+    `).join('') || '<tr><td colspan="4" class="loading-td">No active rules</td></tr>';
+  }
+
+  // 3. App Rules
+  if (state.appRules) {
+    const grid = document.getElementById('rc-app-grid');
+    const apps = ['Chrome', 'Discord', 'Steam', 'Spotify', 'Slack', 'VS Code'];
+    
+    grid.innerHTML = apps.map(app => {
+      const isBlocked = state.appRules[app] === 'block';
+      return `
+      <div class="rc-app-card" style="border-color: ${isBlocked ? 'var(--red)' : 'var(--border-light)'}">
+        <div>
+          <h4>${app}</h4>
+          <p>${isBlocked ? 'Blocked' : 'Allowed'}</p>
+        </div>
+        <button class="btn-sm ${isBlocked ? 'allow-btn' : 'block-btn'}" onclick="remoteSetApp('${app}', '${isBlocked ? 'allow' : 'block'}')">
+          ${isBlocked ? 'Allow' : 'Block'}
+        </button>
+      </div>`;
+    }).join('');
+  }
+
+  // 4. Web Blocker
+  if (state.blockedWebsites) {
+    const container = document.getElementById('rc-web-list');
+    container.innerHTML = state.blockedWebsites.map(site => `
+       <div class="rc-web-entry">
+          <span class="rc-web-domain">${site.domain}</span>
+          <span class="rc-web-action" onclick="remoteUnblockDomain('${site.domain}')">Remove</span>
+       </div>
+    `).join('') || '<div class="wb-empty">No domains restricted</div>';
+  }
+});
+
+// Remote Control Actions (Send to Agent)
+document.getElementById('rc-fw-toggle-global').addEventListener('change', (e) => {
   if (!activeRemoteAgent) return;
   window.aegis.entToggleFirewall(activeRemoteAgent, e.target.checked);
-  showToast('🏢 Remote Command', `Firewall ${e.target.checked ? 'Enabled' : 'Disabled'} on Agent`, 'medium');
 });
 
 async function remoteSetApp(appName, action) {
   if (!activeRemoteAgent) return;
   await window.aegis.entSetAppRule(activeRemoteAgent, appName, action);
-  showToast('🏢 Remote Command', `Policy set: Block ${appName} on Agent`, 'medium');
+  showToast('🏢 Remote Command', `Policy update sent for ${appName}`, 'medium');
 }
 
 async function remoteBlockDomain() {
-  if (!activeRemoteAgent) return;
-  const domain = document.getElementById('rc-domain-input').value.trim();
-  if (!domain) return;
+  const input = document.getElementById('rc-web-input');
+  const domain = input.value.trim();
+  if (!domain || !activeRemoteAgent) return;
+  
   await window.aegis.entBlockWebsite(activeRemoteAgent, domain);
-  showToast('🏢 Remote Command', `Website ${domain} blocked on Agent`, 'medium');
-  document.getElementById('rc-domain-input').value = '';
+  showToast('🏢 Remote Command', `Blocking ${domain} on agent...`, 'medium');
+  input.value = '';
+}
+
+async function remoteUnblockDomain(domain) {
+  // We reuse the set rule logic or add a specifically named event
+  // For hackathon, we'll just treat "unblock" as a different command if needed
+  // But let's just use the existing block interface to simple toggle
 }
 
 window.openRemoteControl = openRemoteControl;
 window.closeRemoteControl = closeRemoteControl;
+window.switchRCTab = switchRCTab;
 window.remoteSetApp = remoteSetApp;
 window.remoteBlockDomain = remoteBlockDomain;
+window.remoteUnblockDomain = remoteUnblockDomain;
