@@ -22,9 +22,8 @@ class TrafficSniffer {
       let iface = 'any'; // Listen on all interfaces (including bridge100 for internet sharing)
 
       // 1) Run tcpdump as background root process. 
-      // We use a subshell and background it to ensure osascript returns immediately.
-      const filter = targetIp ? `host ${targetIp} and (port 53 or port 80 or port 443)` : `(port 53 or port 80 or port 443)`;
-      const cmd = `(tcpdump -l -i ${iface} -n \\"${filter}\\" > ${this.logFile} 2>/dev/null &)`;
+      const filter = targetIp ? `host ${targetIp} and (port 53 or port 80 or port 443)` : `port 53 or port 80 or port 443`;
+      const cmd = `tcpdump -l -i ${iface} -n ${filter} > ${this.logFile} 2>/dev/null &`;
       const osa = `osascript -e 'do shell script "${cmd}" with administrator privileges'`;
       
       console.log("[TrafficSniffer] Requesting admin privileges for tcpdump...");
