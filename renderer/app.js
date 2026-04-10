@@ -49,7 +49,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     loadRules(),
     loadConnections(),
     loadDevices(),
-    loadAppRules(),
     loadIPBlocklist(),
     loadBlockedWebsites()
   ]);
@@ -104,7 +103,6 @@ function switchTab(tabId) {
 
   // Refresh data when switching tabs
   if (tabId === 'connections') loadConnections();
-  if (tabId === 'appcontrol') loadAppRules();
   if (tabId === 'ipblock') loadIPBlocklist();
   if (tabId === 'threats') renderThreats();
 }
@@ -769,88 +767,6 @@ function initAppControlTab() {
   });
 }
 
-async function loadAppRules() {
-  try {
-    const [runningApps, rules, allDomains] = await Promise.all([
-      window.aegis.getRunningApps(),
-      window.aegis.getAppRules(),
-      window.aegis.getAllAppDomains()
-    ]);
-    
-    // Merge running apps into rules for UI mapping
-    const combinedApps = runningApps.map(app => {
-       const rule = rules.find(r => r.appName.toLowerCase() === app.name.toLowerCase());
-       return { 
-         appName: app.name, 
-         path: app.path, 
-         action: rule ? rule.action : 'allow',
-         icon: rule ? rule.icon : '📱',
-         category: rule ? rule.category : 'Application',
-         dataUsed: '0 B'
-       };
-    });
-
-    state.appRules = combinedApps;
-    state.allAppDomains = allDomains;
-    renderAppGrid();
-  } catch (e) {
-    console.error('App rules error:', e);
-  }
-}
-
-function renderAppGrid() {
-  const grid = document.getElementById('app-grid');
-  const allDomains = state.allAppDomains || {};
-
-  grid.innerHTML = state.appRules.map(app => {
-    const domains = allDomains[app.appName] || [];
-    const domainTags = domains.slice(0,4).map(d => `<span class="domain-tag">${d}</span>`).join('');
-    const hasEffect = domains.length > 0;
-
-    return `
-    <div class="app-card ${app.action === 'block' ? 'blocked' : 'allowed'}" data-app="${app.appName}">
-      <div class="app-icon">${app.icon}</div>
-      <div class="app-name">${app.appName}</div>
-      <div class="app-category">${app.category}</div>
-      <div class="app-data">📊 ${app.dataUsed}</div>
-      ${hasEffect ? `<div class="app-domains">${domainTags}${domains.length > 4 ? `<span class="domain-tag">+${domains.length-4}</span>` : ''}</div>` : ''}
-      ${app.action === 'block' && hasEffect
-        ? `<div class="eff-block">🚫 Domains blocked in /etc/hosts</div>`
-        : app.action === 'block' && !hasEffect
-        ? `<div class="eff-block">⚠️ OS firewall only (add domains manually)</div>`
-        : `<div class="eff-allow">✓ Network access allowed</div>`
-      }
-      <div class="app-toggle-row">
-        <button class="app-toggle-btn ${app.action === 'allow' ? 'allow-active' : 'inactive'}"
-          data-app="${app.appName}" data-action="allow">✓ Allow</button>
-        <button class="app-toggle-btn ${app.action === 'block' ? 'block-active' : 'inactive'}"
-          data-app="${app.appName}" data-action="block">✕ Block</button>
-      </div>
-    </div>`;
-  }).join('');
-
-  grid.querySelectorAll('.app-toggle-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const appName = btn.dataset.app;
-      const action  = btn.dataset.action;
-      await window.aegis.setAppRule({ appName, action });
-
-      const app = state.appRules.find(a => a.appName === appName);
-      if (app) app.action = action;
-
-      // Sync blocked websites list
-      await loadBlockedWebsites();
-      renderAppGrid();
-
-      const domains = (state.allAppDomains || {})[appName] || [];
-      const emoji = action === 'block' ? '🚫' : '✅';
-      const domainMsg = domains.length > 0
-        ? ` + ${domains.length} domains blocked in /etc/hosts`
-        : ' (no known domains to block)';
-      showToast(`${emoji} ${appName}`, `Network access ${action}ed${action === 'block' ? domainMsg : ''}.`, action === 'block' ? 'high' : 'info');
-    });
-  });
-}
 
 /* ════════════════════════════════════════════════════════════
    IP BLOCKLIST
@@ -1452,11 +1368,6 @@ document.getElementById('rc-fw-toggle-global').addEventListener('change', (e) =>
   window.aegis.entToggleFirewall(activeRemoteAgent, e.target.checked);
 });
 
-async function remoteSetApp(appName, action) {
-  if (!activeRemoteAgent) return;
-  await window.aegis.entSetAppRule(activeRemoteAgent, appName, action);
-  showToast('🏢 Remote Command', `Policy update sent for ${appName}`, 'medium');
-}
 
 async function remoteBlockDomain() {
   const input = document.getElementById('rc-web-input');
@@ -1477,6 +1388,5 @@ async function remoteUnblockDomain(domain) {
 window.openRemoteControl = openRemoteControl;
 window.closeRemoteControl = closeRemoteControl;
 window.switchRCTab = switchRCTab;
-window.remoteSetApp = remoteSetApp;
 window.remoteBlockDomain = remoteBlockDomain;
 window.remoteUnblockDomain = remoteUnblockDomain;
