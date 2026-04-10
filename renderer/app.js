@@ -1419,10 +1419,14 @@ window.closeRemoteControl = closeRemoteControl;
 window.switchRCTab = switchRCTab;
 window.remoteBlockDomain = remoteBlockDomain;
 window.remoteUnblockDomain = remoteUnblockDomain;
+let wafInspectedCount = 0;
+let wafBlockedCount = 0;
+
 function initWafTab() {
-  const streamEl = document.getElementById('waf-stream');
-  const tbody = document.getElementById('waf-log-tbody');
+  const tbody = document.getElementById('waf-full-stream-tbody');
   const toggle = document.getElementById('waf-master-toggle');
+  const inspectedEl = document.getElementById('waf-stat-inspected');
+  const blockedEl = document.getElementById('waf-stat-blocked');
   
   if (!toggle) return;
 
@@ -1432,28 +1436,24 @@ function initWafTab() {
   });
 
   window.aegis.onWafThreat((threat) => {
-    // Add to log table
+    wafBlockedCount++;
+    blockedEl.textContent = wafBlockedCount;
+    
     const row = `
-      <tr style="background: rgba(255, 68, 68, 0.05)">
-        <td>${new Date(threat.timestamp).toLocaleTimeString()}</td>
-        <td style="color:var(--red); font-weight:700">${threat.attackType}</td>
-        <td>${threat.sourceIp}</td>
-        <td><span class="pill pill-high">MITIGATED</span></td>
+      <tr style="background: rgba(255, 68, 68, 0.15); border-left: 3px solid var(--red);">
+        <td style="color:var(--text-muted)">${new Date(threat.timestamp).toLocaleTimeString()}</td>
+        <td style="font-weight:700; color:var(--red)">${threat.sourceIp}</td>
+        <td style="font-weight:700">ALERT</td>
+        <td style="color:var(--red); font-weight:700">${threat.target}</td>
+        <td><span class="pill pill-high" style="font-size:10px">${threat.attackType} BLOCKED</span></td>
+      </tr>
+      <tr style="background: rgba(255, 68, 68, 0.05);">
+        <td colspan="5" style="color:var(--text-secondary); padding-left:40px; font-style:italic">Evidence: ${threat.evidence}</td>
       </tr>
     `;
-    const current = tbody.innerHTML;
-    if (current.includes('loading-td')) {
-      tbody.innerHTML = row;
-    } else {
-      tbody.innerHTML = row + current;
-    }
     
-    // Add to stream with highlights
-    const entry = document.createElement('div');
-    entry.style.color = 'var(--red)';
-    entry.style.marginBottom = '8px';
-    entry.innerHTML = `[ALERT] ${new Date().toLocaleTimeString()} - DETECTED ${threat.attackType} FROM ${threat.sourceIp}<br> EVIDENCE: ${threat.evidence}`;
-    streamEl.prepend(entry);
+    if (tbody.innerHTML.includes('loading-td')) tbody.innerHTML = '';
+    tbody.insertAdjacentHTML('afterbegin', row);
     
     showToast('🔥 WAF ATTACK BLOCKED', `${threat.attackType} detected and neutralised.`, 'high');
   });
@@ -1461,20 +1461,32 @@ function initWafTab() {
   // REAL-TIME Packet Stream from local device
   window.aegis.onDevicePacket((packet) => {
     if (!toggle.checked) return;
-
-    const entry = document.createElement('div');
-    entry.style.marginBottom = '4px';
-    entry.style.borderLeft = `2px solid ${packet.proto === 'DNS' ? 'var(--cyan)' : 'var(--green)'}`;
-    entry.style.paddingLeft = '8px';
     
+    wafInspectedCount++;
+    inspectedEl.textContent = wafInspectedCount;
+
     const time = new Date().toLocaleTimeString();
     const type = packet.proto || 'PKT';
-    const method = packet.method || 'INSPECT';
+    const method = packet.method || 'GET';
     const target = packet.domain || 'Unresolved Host';
+    const isDns = packet.proto === 'DNS';
     
-    entry.innerHTML = `<span style="color:var(--text-muted)">[${time}]</span> <span style="color:var(--accent); font-weight:700">${type} ${method}</span> <span style="color:var(--text-secondary)">-></span> ${target}`;
+    const row = `
+      <tr>
+        <td style="color:var(--text-muted)">${time}</td>
+        <td>Local Client</td>
+        <td style="color:${isDns ? 'var(--cyan)' : 'var(--accent)'}; font-weight:700">${method}</td>
+        <td style="color:var(--text-primary)">${target}</td>
+        <td><span style="color:var(--green)">✓ Allowed</span></td>
+      </tr>
+    `;
     
-    streamEl.prepend(entry);
-    if (streamEl.children.length > 100) streamEl.lastChild.remove();
+    if (tbody.innerHTML.includes('loading-td')) tbody.innerHTML = '';
+    tbody.insertAdjacentHTML('afterbegin', row);
+
+    // Keep table performing well
+    if (tbody.children.length > 200) {
+      for (let i = 0; i < 20; i++) tbody.lastChild?.remove();
+    }
   });
 }
