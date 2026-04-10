@@ -104,9 +104,14 @@ class FirewallController {
           resolve({ success: true, ip, blockedAt: Date.now() });
         });
       } else {
-        const pfRule = `block in from ${ip} to any`;
-        exec(`echo "${pfRule}" | pfctl -ef - 2>/dev/null || true`, () => {
-          resolve({ success: true, ip, blockedAt: Date.now() });
+        // macOS: Use dedicated anchors to avoid wiping main pf rules
+        const rules = Array.from(this.blockedIPs).map(bip => `block drop in from ${bip} to any`).join('\n');
+        const cmd = `echo "${rules}" | pfctl -a aegis -f - 2>/dev/null || true`;
+        exec(cmd, () => {
+          // Ensure anchor is linked in main pf if not already
+          exec(`pfctl -a aegis -e 2>/dev/null || true`, () => {
+            resolve({ success: true, ip, blockedAt: Date.now() });
+          });
         });
       }
     });
@@ -121,7 +126,11 @@ class FirewallController {
           resolve({ success: true, ip });
         });
       } else {
-        exec(`pfctl -F all 2>/dev/null || true`, () => {
+        const rules = Array.from(this.blockedIPs).map(bip => `block drop in from ${bip} to any`).join('\n');
+        const cmd = rules.length > 0 
+          ? `echo "${rules}" | pfctl -a aegis -f - 2>/dev/null || true`
+          : `pfctl -a aegis -F all 2>/dev/null || true`;
+        exec(cmd, () => {
           resolve({ success: true, ip });
         });
       }

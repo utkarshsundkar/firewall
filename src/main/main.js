@@ -58,16 +58,21 @@ function createWindow() {
 
 function checkAuthorization() {
   if (process.platform === 'darwin') {
-    // macOS: Unlock driver and hosts
+    // macOS: Unlock driver and hosts, and ensure Aegis anchor is declared in pf.conf
     const setupScript = [
       'chmod 666 /etc/hosts',
       'chmod 666 /dev/pf',
+      'grep -q "anchor \\"aegis/*\\"" /etc/pf.conf || echo "anchor \\"aegis/*\\"" >> /etc/pf.conf',
+      'grep -q "load anchor \\"aegis\\" from \\"/etc/pf.anchors/aegis\\"" /etc/pf.conf || echo "load anchor \\"aegis\\" from \\"/etc/pf.anchors/aegis\\"" >> /etc/pf.conf',
+      'mkdir -p /etc/pf.anchors',
+      'touch /etc/pf.anchors/aegis',
+      'chmod 666 /etc/pf.anchors/aegis',
       'pfctl -E || true',
       'pfctl -f /etc/pf.conf || true'
     ].join(' && ');
     const osa = `osascript -e 'do shell script "${setupScript}" with administrator privileges'`;
     exec(osa, (err) => {
-       if (!err) console.log('Aegis MacOS Authorized');
+       if (!err) console.log('Aegis MacOS Authorized & Anchor Linked');
     });
   } else if (process.platform === 'win32') {
     // Windows: Unlock hosts file for direct access and verify firewall
@@ -125,9 +130,23 @@ function initServices() {
     }
   });
 
-  attackDetector.start((alert) => {
+  attackDetector.start(async (alert) => {
     if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
       mainWindow.webContents.send('threat-alert', alert);
+    }
+
+    // Auto-mitigation logic: Block High/Critical IPs instantly
+    if ((alert.severity === 'high' || alert.severity === 'critical') && alert.sourceIP && !alert.mitigated) {
+       console.log(`[AUTO-MITIGATE] ${alert.title} from ${alert.sourceIP}. Blocking source...`);
+       const result = await firewallController.blockIP(alert.sourceIP);
+       if (result.success) {
+         alert.mitigated = true;
+         alert.mitigation = 'Aegis Sentinel Auto-Block';
+         // Notify UI of mitigation
+         if (mainWindow && !mainWindow.isDestroyed()) {
+           mainWindow.webContents.send('threat-log-updated'); 
+         }
+       }
     }
   });
 }
