@@ -21,16 +21,24 @@ class TrafficSniffer {
     if (process.platform === 'darwin') {
       let iface = 'any'; // Listen on all interfaces (including bridge100 for internet sharing)
 
-      // 1) Run tcpdump as background root process. Native macOS auth dialog will appear!
-      // If targetIp is provided, filter for it, otherwise capture all web traffic
+      // 1) Run tcpdump as background root process. 
+      // We use a subshell and background it to ensure osascript returns immediately.
       const filter = targetIp ? `host ${targetIp} and (port 53 or port 80 or port 443)` : `(port 53 or port 80 or port 443)`;
-      const cmd = `tcpdump -l -i ${iface} -n \\"${filter}\\" > ${this.logFile} 2>&1 &`;
+      const cmd = `(tcpdump -l -i ${iface} -n "${filter}" > ${this.logFile} 2>/dev/null &)`;
       const osa = `osascript -e 'do shell script "${cmd}" with administrator privileges'`;
       
+      console.log("[TrafficSniffer] Requesting admin privileges for tcpdump...");
       exec(osa, (err, stdout, stderr) => {
         if (err) {
             console.error("TrafficSniffer: Auth failed or cancelled", err);
-            callback({ proto: 'SYS', method: 'ERR', domain: 'Admin access required to capture packets', time: new Date().toLocaleTimeString('en-US', {hour12:false}) });
+            callback({ 
+              proto: 'SYS', 
+              method: 'ERR', 
+              domain: 'Capture auth failed. Click WAF tab again to retry.', 
+              time: new Date().toLocaleTimeString('en-US', {hour12:false}) 
+            });
+        } else {
+            console.log("[TrafficSniffer] Capture started successfully.");
         }
       });
       
