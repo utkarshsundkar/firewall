@@ -34,7 +34,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   initFirewallTab();
   initConnectionsTab();
   initDevicesTab();
-  initAppControlTab();
   initIPBlockTab();
   initWebsiteBlocker();
   initEnterpriseTab();
@@ -757,15 +756,7 @@ window.clearDeviceLogs = clearDeviceLogs;
 /* ════════════════════════════════════════════════════════════
    APP CONTROL
    ════════════════════════════════════════════════════════════ */
-function initAppControlTab() {
-  document.getElementById('app-search').addEventListener('input', e => {
-    const q = e.target.value.toLowerCase();
-    document.querySelectorAll('.app-card').forEach(card => {
-      const name = card.querySelector('.app-name').textContent.toLowerCase();
-      card.style.display = name.includes(q) ? '' : 'none';
-    });
-  });
-}
+
 
 
 /* ════════════════════════════════════════════════════════════
