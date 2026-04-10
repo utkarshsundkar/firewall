@@ -166,8 +166,14 @@ class EnterpriseManager {
              await this.websiteBlocker.blockAppDomains(msg.appName, msg.action);
              this.socket.send(JSON.stringify({ type: 'FULL_STATE_UPDATE', appRules: await this.appController.getAppRules() }));
           } else if (msg.type === 'BLOCK_WEBSITE') {
-             await this.websiteBlocker.blockDomain(msg.domain, 'Admin Remote Block');
-             this.socket.send(JSON.stringify({ type: 'FULL_STATE_UPDATE', blockedWebsites: await this.websiteBlocker.getBlockedList() }));
+              console.log(`[AGENT] Received Remote Block Request: ${msg.domain}`);
+              try {
+                const res = await this.websiteBlocker.blockDomain(msg.domain, 'Admin Remote Block');
+                console.log(`[AGENT] Block Result for ${msg.domain}:`, res);
+                this.socket.send(JSON.stringify({ type: 'FULL_STATE_UPDATE', blockedWebsites: await this.websiteBlocker.getBlockedList() }));
+              } catch (err) {
+                console.error(`[AGENT] Failed to block ${msg.domain}:`, err);
+              }
           }
         } catch (e) {
           console.error('Agent message error:', e);
@@ -252,7 +258,7 @@ class EnterpriseManager {
       return false;
     }
     
-    console.log(`[FLEET BROADCAST] Pulsing command ${type} to ${this.agents.size} agents...`);
+    console.log(`[FLEET BROADCAST] Pulsing command ${type} to system...`);
     
     const msg = JSON.stringify({ type, ...payload });
     let count = 0;
@@ -262,14 +268,31 @@ class EnterpriseManager {
         ag.ws.send(msg);
         count++;
         console.log(` -> Sent to agent ${id} (${ag.data.hostname})`);
-      } else {
-        console.warn(` -> Agent ${id} socket not open, skipping.`);
       }
     });
 
-    console.log(`[FLEET BROADCAST] Completed. reached ${count} agents.`);
+    if (count === 0) {
+      this.safeSend('threat-alert', { 
+        title: 'Fleet Management', 
+        message: 'Broadcast failed: No active agents connected.', 
+        severity: 'medium' 
+      });
+    } else {
+      this.safeSend('threat-alert', { 
+        title: 'Policy Enforced', 
+        message: `Successfully pushed policy to ${count} active agents.`, 
+        severity: 'low' 
+      });
+    }
+
+    console.log(`[FLEET BROADCAST] Completed. Reached ${count} active agents.`);
     return true;
   }
+
+  /* ── AGENT LOGIC ───────────────────────────────────────────── */
+  // (Inside the message handler around line 130+)
+  // I need to find the agent message handler again.
+
 
   /* ── AGENT LOGIC ───────────────────────────────────────────── */
   startAgentSync() {
