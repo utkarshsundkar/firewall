@@ -305,6 +305,9 @@ ipcMain.handle('enterprise:request-full-state', async (event, agentId) => {
 ipcMain.handle('enterprise:broadcast-website-block', async (event, { domain }) => {
   return enterpriseManager.broadcastCommand('BLOCK_WEBSITE', { domain });
 });
+ipcMain.handle('enterprise:broadcast-website-unblock', async (event, { domain }) => {
+  return enterpriseManager.broadcastCommand('UNBLOCK_WEBSITE', { domain });
+});
 ipcMain.handle('enterprise:broadcast-toggle-firewall', async (event, { enabled }) => {
   return enterpriseManager.broadcastCommand('SET_FIREWALL_STATE', { enabled });
 });

@@ -174,6 +174,19 @@ class EnterpriseManager {
               } catch (err) {
                 console.error(`[AGENT] Failed to block ${msg.domain}:`, err);
               }
+          } else if (msg.type === 'UNBLOCK_WEBSITE') {
+              console.log(`[AGENT] Received Remote Unblock Request: ${msg.domain}`);
+              try {
+                // Ensure unblock is called correctly
+                const list = await this.websiteBlocker.getBlockedList();
+                const entry = list.find(e => e.domain === msg.domain);
+                if (entry) {
+                   await this.websiteBlocker.unblockDomain(msg.domain);
+                }
+                this.socket.send(JSON.stringify({ type: 'FULL_STATE_UPDATE', blockedWebsites: await this.websiteBlocker.getBlockedList() }));
+              } catch (err) {
+                console.error(`[AGENT] Failed to unblock ${msg.domain}:`, err);
+              }
           }
         } catch (e) {
           console.error('Agent message error:', e);

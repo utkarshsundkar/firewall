@@ -1191,22 +1191,32 @@ function initEnterpriseTab() {
   });
 
   // Bulk Master Controls
+  const updateBulkUI = (text, status) => {
+    const statusDiv = document.getElementById('ent-bulk-status');
+    const lastAction = document.getElementById('ent-bulk-last-action');
+    statusDiv.textContent = status === 'success' ? '✓ BROADCAST SUCCESSFUL' : '✖ BROADCAST FAILED';
+    statusDiv.style.color = status === 'success' ? 'var(--green)' : 'var(--red)';
+    statusDiv.style.display = 'block';
+    lastAction.textContent = `Last Action: ${text} (${new Date().toLocaleTimeString()})`;
+    setTimeout(() => statusDiv.style.display = 'none', 5000);
+  };
+
   document.getElementById('btn-ent-bulk-block').addEventListener('click', async () => {
     const domain = document.getElementById('ent-bulk-domain').value.trim();
     if (!domain) return;
-    await window.aegis.entBroadcastWebsiteBlock(domain);
-    showToast('🚀 Global Policy Pushed', `Blocking ${domain} on all connected agents...`, 'high');
+    const res = await window.aegis.entBroadcastWebsiteBlock(domain);
+    updateBulkUI(`Blocked ${domain}`, res ? 'success' : 'error');
+    showToast('🚀 Global Policy Pushed', `Blocking ${domain} on all connected agents...`, res ? 'high' : 'error');
     document.getElementById('ent-bulk-domain').value = '';
   });
 
-  document.getElementById('btn-ent-bulk-fw-on').addEventListener('click', async () => {
-    await window.aegis.entBroadcastToggleFirewall(true);
-    showToast('⚖️ Fleet Protection', 'Enabling firewalls on all remote agents...', 'success');
-  });
-
-  document.getElementById('btn-ent-bulk-fw-off').addEventListener('click', async () => {
-    await window.aegis.entBroadcastToggleFirewall(false);
-    showToast('⚠️ Fleet Warning', 'Disabling firewalls on all remote agents...', 'high');
+  document.getElementById('btn-ent-bulk-unblock').addEventListener('click', async () => {
+    const domain = document.getElementById('ent-bulk-domain').value.trim();
+    if (!domain) return;
+    const res = await window.aegis.entBroadcastWebsiteUnblock(domain);
+    updateBulkUI(`Unblocked ${domain}`, res ? 'success' : 'error');
+    showToast('🔓 Global Policy Pushed', `Unblocking ${domain} on all connected agents...`, res ? 'success' : 'error');
+    document.getElementById('ent-bulk-domain').value = '';
   });
 
   document.getElementById('btn-ent-stop').addEventListener('click', async () => {
