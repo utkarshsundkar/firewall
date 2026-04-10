@@ -99,7 +99,8 @@ class FirewallController {
     return new Promise((resolve) => {
       this.blockedIPs.add(ip);
       if (this.platform === 'win32') {
-        exec(`netsh advfirewall firewall add rule name="Block-${ip}" dir=in action=block remoteip=${ip}`, () => {
+        const cmd = `powershell -NoProfile -Command "Start-Process netsh -ArgumentList 'advfirewall firewall add rule name=\\"Block-${ip}\\" dir=in action=block remoteip=${ip}' -Verb RunAs"`;
+        exec(cmd, () => {
           resolve({ success: true, ip, blockedAt: Date.now() });
         });
       } else {
@@ -115,7 +116,8 @@ class FirewallController {
     return new Promise((resolve) => {
       this.blockedIPs.delete(ip);
       if (this.platform === 'win32') {
-        exec(`netsh advfirewall firewall delete rule name="Block-${ip}"`, () => {
+        const cmd = `powershell -NoProfile -Command "Start-Process netsh -ArgumentList 'advfirewall firewall delete rule name=\\"Block-${ip}\\"' -Verb RunAs"`;
+        exec(cmd, () => {
           resolve({ success: true, ip });
         });
       } else {
@@ -128,7 +130,8 @@ class FirewallController {
 
   _buildRuleCommand(rule) {
     if (this.platform === 'win32') {
-      return `netsh advfirewall firewall add rule name="${rule.name}" dir=${rule.direction === 'out' ? 'out' : 'in'} action=${rule.action} protocol=${rule.protocol} localport=${rule.port}`;
+      const cmd = `netsh advfirewall firewall add rule name=\\"${rule.name}\\" dir=${rule.direction === 'out' ? 'out' : 'in'} action=${rule.action} protocol=${rule.protocol} localport=${rule.port}`;
+      return `powershell -NoProfile -Command "Start-Process netsh -ArgumentList 'advfirewall firewall add rule name=\\"${rule.name}\\" dir=${rule.direction === 'out' ? 'out' : 'in'} action=${rule.action} protocol=${rule.protocol} localport=${rule.port}' -Verb RunAs"`;
     } else {
       const action = rule.action === 'allow' ? 'pass' : 'block';
       const dir = rule.direction === 'out' ? 'out' : 'in';

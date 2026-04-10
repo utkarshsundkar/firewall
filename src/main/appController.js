@@ -102,9 +102,9 @@ class AppController {
     if (this.platform === 'win32') {
       const prog = `%ProgramFiles%\\${appName}\\${appName}.exe`;
       if (action === 'block') {
-        return `netsh advfirewall firewall add rule name="AEGIS-${appName}" dir=out action=block program="${prog}"`;
+        return `powershell -NoProfile -Command "Start-Process netsh -ArgumentList 'advfirewall firewall add rule name=\\"AEGIS-${appName}\\" dir=out action=block program=\\"${prog}\\"' -Verb RunAs"`;
       } else {
-        return `netsh advfirewall firewall delete rule name="AEGIS-${appName}"`;
+        return `powershell -NoProfile -Command "Start-Process netsh -ArgumentList 'advfirewall firewall delete rule name=\\"AEGIS-${appName}\\"' -Verb RunAs"`;
       }
     } else {
       // macOS: use Application Firewall (socketfilterfw)

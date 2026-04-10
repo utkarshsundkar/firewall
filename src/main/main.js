@@ -70,11 +70,11 @@ function checkAuthorization() {
        if (!err) console.log('Aegis MacOS Authorized');
     });
   } else if (process.platform === 'win32') {
-    // Windows: Unlock hosts file and verify firewall
-    // Using icacls to grant full permissions to the current user for the hosts file
-    const currentUser = process.env.USERNAME;
+    // Windows: Unlock hosts file for direct access and verify firewall
+    // Granting 'Everyone' full access temporarily to allow Aegis to manage blocks
     const hostsPath = 'C:\\Windows\\System32\\drivers\\etc\\hosts';
-    const psScript = `Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile -Command "icacls \\"${hostsPath}\\" /grant \\"${currentUser}:(F)\\"; netsh advfirewall set allprofiles state on"' -Wait`;
+    const psCommand = `icacls \\"${hostsPath}\\" /grant Everyone:F; netsh advfirewall set allprofiles state on`;
+    const psScript = `Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile -Command "${psCommand}"' -Wait`;
     exec(`powershell -NoProfile -Command "${psScript}"`, (err) => {
       if (!err) console.log('Aegis Windows Authorized');
     });
