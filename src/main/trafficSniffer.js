@@ -20,17 +20,18 @@ class TrafficSniffer {
 
     console.log('[TrafficSniffer] Starting lsof-based connection monitor...');
 
-    // Poll every 2 seconds using lsof
+    // Poll every 500ms — critical for catching high-velocity DoS bursts
     this.pollInterval = setInterval(() => {
       this._pollConnections();
-    }, 2000);
+    }, 500);
 
     // First poll immediately
     setTimeout(() => this._pollConnections(), 500);
   }
 
   _pollConnections() {
-    const cmd = `lsof -i tcp -n -P 2>/dev/null | grep -E 'ESTABLISHED|SYN_SENT'`;
+    // Use netstat for better compatibility and speed on macOS
+    const cmd = `netstat -f inet -n | grep -E 'ESTABLISHED|SYN_SENT|UDP'`;
     exec(cmd, { timeout: 5000 }, async (err, stdout) => {
       if (err || !stdout) return;
 
@@ -39,40 +40,47 @@ class TrafficSniffer {
 
       for (const line of lines) {
         try {
-          // lsof format: COMMAND   PID   USER   FD   TYPE   DEVICE   SIZE   NODE   NAME
-          // NAME is like: 192.168.1.5:55234->142.250.68.142:443 (ESTABLISHED)
-          const nameMatch = line.match(/(\d+\.\d+\.\d+\.\d+):(\d+)->(\d+\.\d+\.\d+\.\d+):(\d+)/);
-          if (!nameMatch) continue;
+          // Netstat format: proto  recv-q send-q  local address  foreign address  state
+          // tcp4  0  0  127.0.0.1.55234  127.0.0.1.443  ESTABLISHED
+          const parts = line.trim().split(/\s+/);
+          if (parts.length < 4) continue;
 
-          const srcIp = nameMatch[1];
-          const dstIp = nameMatch[3];
-          const dstPort = nameMatch[4];
+          const local = parts[3];
+          const foreign = parts[4];
+          
+          // Parse IP and Port (Mac netstat uses dot for port)
+          const localMatch = local.match(/(.+)\.(\d+)$/);
+          const foreignMatch = foreign ? foreign.match(/(.+)\.(\d+)$/) : null;
 
-          // Filter to only outbound connections (not loopback)
-          if (dstIp === '127.0.0.1' || dstIp === '::1') continue;
-          if (this.targetIp && srcIp !== this.targetIp && dstIp !== this.targetIp) continue;
+          if (!localMatch || !foreignMatch) continue;
 
-          const connKey = `${srcIp}:${nameMatch[2]}->${dstIp}:${dstPort}`;
+          const srcIp = localMatch[1] === '*' ? '0.0.0.0' : localMatch[1];
+          const dstIp = foreignMatch[1];
+          const dstPort = foreignMatch[2];
+
+          // Connection metadata for seen list
+          const connKey = `${srcIp}->${dstIp}:${dstPort}`;
           if (this.seenConnections.has(connKey)) continue;
           this.seenConnections.add(connKey);
 
-          // Cap seen set size
-          if (this.seenConnections.size > 500) {
-            // Clear oldest entries
-            const iter = this.seenConnections.values();
-            for (let i = 0; i < 100; i++) this.seenConnections.delete(iter.next().value);
-          }
+          if (this.seenConnections.size > 2000) this.seenConnections.clear();
 
           const domain = await this.resolveIp(dstIp);
-          let proto = 'TCP';
+          let proto = parts[0].includes('udp') ? 'UDP' : 'TCP';
           let method = `PORT ${dstPort}`;
 
           if (dstPort === '443') { proto = 'HTTPS'; method = 'TLS'; }
           else if (dstPort === '80') { proto = 'HTTP'; method = 'GET'; }
-          else if (dstPort === '53') { proto = 'DNS'; method = 'Query'; }
-
-          this.callback({ proto, method, domain, sourceIp: srcIp, time: now });
-        } catch (e) { /* skip malformed lines */ }
+          
+          this.callback({ 
+            proto, 
+            method, 
+            domain, 
+            sourceIp: srcIp, 
+            ip: srcIp === '127.0.0.1' ? dstIp : srcIp,
+            time: now 
+          });
+        } catch (e) { }
       }
     });
   }

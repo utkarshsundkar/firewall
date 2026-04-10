@@ -45,6 +45,9 @@ contextBridge.exposeInMainWorld('aegis', {
   // Threats
   getThreatLog: () => ipcRenderer.invoke('get-threat-log'),
   clearThreats: () => ipcRenderer.invoke('clear-threats'),
+  checkUrlSafety: (domain) => ipcRenderer.invoke('check-url-safety', domain),
+  openLogsFolder: () => ipcRenderer.invoke('open-logs-folder'),
+  setLoggingState: (enabled) => ipcRenderer.invoke('set-logging-state', enabled),
   
   // WAF
   getWafLog: () => ipcRenderer.invoke('get-waf-log'),
@@ -56,6 +59,7 @@ contextBridge.exposeInMainWorld('aegis', {
   onThreatAlert: (callback) => ipcRenderer.on('threat-alert', (_, alert) => callback(alert)),
   onWafThreat: (callback) => ipcRenderer.on('waf-threat', (_, threat) => callback(threat)),
   onDevicePacket: (callback) => ipcRenderer.on('device-packet', (_, packet) => callback(packet)),
+  onStandalonePacket: (callback) => ipcRenderer.on('standalone-packet', (_, packet) => callback(packet)),
   
   // Window controls
   minimize: () => ipcRenderer.send('window-minimize'),

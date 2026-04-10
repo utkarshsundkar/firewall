@@ -11,8 +11,53 @@ const WebsiteBlocker = require('./websiteBlocker');
 const DeviceManager = require('./deviceManager');
 const TrafficSniffer = require('./trafficSniffer');
 const EnterpriseManager = require('./enterprise');
+const TcpdumpSniffer = require('./tcpdumpSniffer');
+const WebSocket = require('ws');
 
 let mainWindow;
+let standaloneSocket;
+let tcpdumpSniffer;
+let isLoggingEnabled = false;
+
+ipcMain.handle('set-logging-state', async (event, enabled) => {
+  isLoggingEnabled = enabled;
+  return true;
+});
+
+function connectToStandaloneWAF() {
+  standaloneSocket = new WebSocket('ws://localhost:3005');
+  
+  standaloneSocket.on('open', () => {
+    console.log('[BRIDGE] Connected to Standalone WAF');
+  });
+
+  standaloneSocket.on('message', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        const packet = JSON.parse(data);
+        mainWindow.webContents.send('standalone-packet', packet);
+        
+        // Persistent Logging (Only if enabled)
+        if (isLoggingEnabled) {
+          const logEntry = JSON.stringify({ ...packet, capturedAt: new Date().toISOString() }) + '\n';
+          fs.appendFile(path.join(__dirname, '../../logs/traffic_capture.jsonl'), logEntry, (err) => {
+             if (err) console.error('Logging error:', err);
+          });
+        }
+      } catch (e) {}
+    }
+  });
+
+  standaloneSocket.on('error', () => {
+    // Retry in 5s if standalone is not running
+    setTimeout(connectToStandaloneWAF, 5000);
+  });
+
+  standaloneSocket.on('close', () => {
+    setTimeout(connectToStandaloneWAF, 5000);
+  });
+}
+
 let tray;
 let networkMonitor;
 let firewallController;
@@ -125,6 +170,7 @@ function initServices() {
   appController = new AppController(websiteBlocker);
   deviceManager  = new DeviceManager();
   trafficSniffer = new TrafficSniffer();
+  tcpdumpSniffer = new TcpdumpSniffer();
   wafManager = new WAFManager();
 
   enterpriseManager = new EnterpriseManager(mainWindow, {
@@ -149,6 +195,11 @@ function startHighPrivilegeServices() {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('device-packet', packet);
       
+      // Real-time Threat Analysis (DDoS detection)
+      if (packet.ip) {
+        attackDetector.recordConnection(packet.ip);
+      }
+      
       // Real-time WAF Inspection
       if (packet.proto === 'HTTP' || packet.proto === 'DNS' || packet.proto === 'HTTPS') {
         wafManager.inspectRequest({
@@ -158,6 +209,15 @@ function startHighPrivilegeServices() {
         });
       }
     }
+  });
+
+  // Deep Packet Inspection for DoS (tcpdump)
+  tcpdumpSniffer.start((packet) => {
+    if (packet.ip) {
+      attackDetector.recordConnection(packet.ip);
+    }
+    // High-frequency sample for console verification
+    if (Math.random() < 0.001) console.log('[DPI] Captured:', packet.raw);
   });
 
   networkMonitor.start((data) => {
@@ -300,6 +360,13 @@ ipcMain.handle('get-threat-log', async () => {
   return attackDetector.getThreatLog();
 });
 
+ipcMain.handle('check-url-safety', async (event, domain) => {
+  return {
+    isSafe: attackDetector.checkUrlSafety(domain).length === 0,
+    reasons: attackDetector.checkUrlSafety(domain)
+  };
+});
+
 ipcMain.handle('get-waf-log', async () => {
   return wafManager.getThreatLog();
 });
@@ -331,6 +398,13 @@ ipcMain.handle('get-connections', async () => {
 
 ipcMain.handle('clear-threats', async () => {
   return attackDetector.clearLog();
+});
+
+ipcMain.handle('open-logs-folder', async () => {
+  const logPath = path.join(__dirname, '../../logs');
+  if (process.platform === 'darwin') exec(`open "${logPath}"`);
+  else if (process.platform === 'win32') exec(`explorer "${logPath}"`);
+  return true;
 });
 
 // Enterprise Fleet IPC
@@ -388,6 +462,7 @@ app.whenReady().then(() => {
   initServices();
   createWindow();
   setupTray();
+  connectToStandaloneWAF();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

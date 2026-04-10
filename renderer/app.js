@@ -1503,3 +1503,98 @@ function initWafTab() {
     }
   });
 }
+
+// Phishing & URL Safety Check
+document.getElementById('btn-check-url').addEventListener('click', async () => {
+  const input = document.getElementById('manual-url-input');
+  const resultDiv = document.getElementById('url-check-result');
+  const titleDiv = document.getElementById('url-check-title');
+  const reasonsDiv = document.getElementById('url-check-reasons');
+  const domain = input.value.trim();
+
+  if (!domain) return;
+
+  const result = await window.aegis.checkUrlSafety(domain);
+  resultDiv.style.display = 'block';
+
+  if (result.isSafe) {
+    resultDiv.style.background = 'rgba(16, 185, 129, 0.1)';
+    resultDiv.style.border = '1px solid #10b981';
+    titleDiv.style.color = '#10b981';
+    titleDiv.innerText = '✅ Link Appears Safe';
+    reasonsDiv.innerText = 'Our engine detected no phishing indicators for this domain.';
+  } else {
+    resultDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+    resultDiv.style.border = '1px solid #ef4444';
+    titleDiv.style.color = '#ef4444';
+    titleDiv.innerText = '⚠️ Suspicious Link Detected';
+    reasonsDiv.innerText = result.reasons.join(', ');
+  }
+});
+
+// Standalone WAF Bridge
+window.aegis.onStandalonePacket((packet) => {
+  const tbody = document.getElementById('standalone-tbody');
+  const dot = document.getElementById('standalone-status-dot');
+  const text = document.getElementById('standalone-status-text');
+
+  // Update status UI
+  dot.style.background = '#10b981';
+  text.innerText = 'Connected to Standalone';
+
+  // Remove loading row if first packet
+  if (tbody.querySelector('.loading-td')) tbody.innerHTML = '';
+
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${packet.timestamp}</td>
+    <td style="color:var(--cyan); font-weight:700">${packet.domain}</td>
+    <td style="opacity:0.8">${packet.ip}</td>
+    <td>${packet.port}</td>
+    <td style="color:var(--text-muted)">${packet.proto}</td>
+    <td style="font-weight:700">${packet.method}</td>
+    <td><span class="process-badge">${packet.process}</span></td>
+  `;
+  
+  tbody.insertBefore(tr, tbody.firstChild);
+  
+  // Keep last 100 rows
+  if (tbody.children.length > 100) tbody.removeChild(tbody.lastChild);
+});
+
+// Open logs folder
+document.getElementById('btn-open-logs').addEventListener('click', () => {
+  window.aegis.openLogsFolder();
+});
+
+// Logging Toggle
+document.getElementById('logging-toggle').addEventListener('change', (e) => {
+  window.aegis.setLoggingState(e.target.checked);
+});
+
+// Mitigation Report Modal Logic
+window.aegis.onThreatAlert((alert) => {
+  if (alert.severity === 'high' || alert.severity === 'critical') {
+    const modal = document.getElementById('mitigation-modal');
+    document.getElementById('modal-type').innerText = alert.title || alert.type.toUpperCase();
+    document.getElementById('modal-ip').innerText = alert.sourceIP || 'Local Client Interference';
+    document.getElementById('modal-action').innerText = 'SOURCE IP BLOCKED';
+    document.getElementById('modal-desc').innerText = alert.description;
+    
+    modal.style.display = 'flex';
+  }
+});
+
+document.getElementById('close-modal').addEventListener('click', () => {
+  document.getElementById('mitigation-modal').style.display = 'none';
+});
+
+// Manual Block from Modal
+document.getElementById('btn-modal-block').addEventListener('click', async () => {
+  const ip = document.getElementById('modal-ip').innerText;
+  if (ip && ip !== 'Local Client Interference') {
+    await window.aegis.blockSourceIp(ip);
+    alert('IP ' + ip + ' has been permanently added to the firewall blocklist.');
+    document.getElementById('mitigation-modal').style.display = 'none';
+  }
+});

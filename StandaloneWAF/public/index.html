@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aegis | Standalone Traffic Analyzer</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="glass-container">
+        <header>
+            <div class="logo">
+                <span class="shield">🛡️</span>
+                <h1>AEGIS INTERCEPT</h1>
+            </div>
+            <div class="status">
+                <span class="pulse"></span> LIVE MONITORING 
+                <span id="last-update" style="margin-left: 10px; opacity: 0.6; font-size: 0.7rem;"></span>
+            </div>
+        </header>
+
+        <section class="stats-grid">
+            <div class="stat-card">
+                <span class="label">Total Intercepts</span>
+                <span class="value" id="total-count">0</span>
+            </div>
+            <div class="stat-card">
+                <span class="label">Top Destination</span>
+                <span class="value" id="top-dest">---</span>
+            </div>
+        </section>
+
+        <main class="traffic-monitor">
+            <div class="table-header">
+                <span>TIME</span>
+                <span>DESTINATION</span>
+                <span>IP ADDRESS</span>
+                <span>PORT</span>
+                <span>PROTO</span>
+                <span>METHOD</span>
+                <span>PROCESS</span>
+            </div>
+            <div id="traffic-log" class="log-container">
+                <!-- Data injected here -->
+                <div class="empty-state">Waiting for traffic...</div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
