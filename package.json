@@ -1,0 +1,26 @@
+{
+  "name": "aegis-firewall",
+  "version": "1.0.0",
+  "description": "Aegis - Cross-platform Firewall & Network Security Application",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "keywords": [
+    "firewall",
+    "security",
+    "network",
+    "electron"
+  ],
+  "author": "Aegis Security",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.3.3"
+  },
+  "dependencies": {
+    "node-netstat": "^1.8.0",
+    "systeminformation": "^5.22.10",
+    "ws": "^8.20.0"
+  }
+}
