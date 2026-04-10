@@ -24,7 +24,7 @@ class TrafficSniffer {
       // 1) Run tcpdump as background root process. 
       // We use a subshell and background it to ensure osascript returns immediately.
       const filter = targetIp ? `host ${targetIp} and (port 53 or port 80 or port 443)` : `(port 53 or port 80 or port 443)`;
-      const cmd = `(tcpdump -l -i ${iface} -n "${filter}" > ${this.logFile} 2>/dev/null &)`;
+      const cmd = `(tcpdump -l -i ${iface} -n \\"${filter}\\" > ${this.logFile} 2>/dev/null &)`;
       const osa = `osascript -e 'do shell script "${cmd}" with administrator privileges'`;
       
       console.log("[TrafficSniffer] Requesting admin privileges for tcpdump...");
@@ -76,20 +76,21 @@ class TrafficSniffer {
     if (!timeMatch) return null;
     const time = timeMatch[1];
 
-    // Check for DNS query
-    if (line.includes(' A? ') || line.includes(' AAAA? ')) {
+    // Check for DNS query (Port 53)
+    if (line.includes('.53: ') || line.includes(' A? ') || line.includes(' AAAA? ')) {
        const match = line.match(/A\??\s+([a-zA-Z0-9.-]+)\./);
        if (match) {
            return { proto: 'DNS', method: 'Query', domain: match[1], time };
        }
     }
 
-    // Check for HTTP/HTTPS outward packets
-    if (line.includes(`IP ${targetIp}.`) && line.includes(' > ')) {
+    // Check for HTTP/HTTPS outward packets 
+    // Generic match: IP [ANY] > [ANY].[PORT]:
+    if (line.includes(' > ')) {
         const parts = line.split(' > ');
         if (parts.length < 2) return null;
         
-        // Match destination IP and port
+        // Match destination IP and port from the second part
         const dstMatch = parts[1].match(/^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\.(\d+):/);
         if (dstMatch) {
             const dstIp = dstMatch[1];

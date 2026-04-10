@@ -731,14 +731,14 @@
                 <h3 style="margin:0">Real-time Payload Stream</h3>
                 <div class="pill pill-low" id="waf-pps">0 REQ/S</div>
               </div>
-              <div id="waf-stream" style="flex: 1; height: 350px; overflow-y: auto; background: var(--bg-input); border-radius: 8px; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px;">
+              <div id="waf-stream" style="flex: 1; height: 600px; overflow-y: auto; background: var(--bg-input); border-radius: 8px; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6;">
                  <div style="color:var(--text-muted)">Awaiting traffic capture... (Ensure Enterprise Server is started)</div>
               </div>
            </div>
 
-           <div class="card">
+           <div class="card" style="display: flex; flex-direction: column;">
               <h3>WAF Threat Inspector</h3>
-              <div style="margin-top: 12px; max-height: 350px; overflow-y: auto;">
+              <div style="margin-top: 12px; flex: 1; height: 600px; overflow-y: auto;">
                  <table class="rules-table">
                    <thead>
                      <tr><th>Time</th><th>Attack Type</th><th>Source</th><th>Status</th></tr>
