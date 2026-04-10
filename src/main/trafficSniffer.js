@@ -18,27 +18,27 @@ class TrafficSniffer {
     if (process.platform === 'darwin') {
       let iface = 'any'; // Listen on all interfaces (including bridge100 for internet sharing)
 
-      // 1) Run tcpdump as background root process. 
-      const filter = targetIp ? `host ${targetIp} and (port 53 or port 80 or port 443)` : `port 53 or port 80 or port 443`;
-      const cmd = `tcpdump -l -i ${iface} -n ${filter} > ${this.logFile} 2>/dev/null &`;
-      const osa = `osascript -e 'do shell script "${cmd}" with administrator privileges'`;
+      // Write a shell script to disk and execute it — avoids all quoting/escaping issues
+      const scriptPath = `/tmp/aegis_capture_${Date.now()}.sh`;
+      const filter = targetIp ? `host ${targetIp} and \\( port 53 or port 80 or port 443 \\)` : `port 53 or port 80 or port 443`;
+      const scriptContent = `#!/bin/bash\ntcpdump -l -i any -n ${filter} > "${this.logFile}" 2>/dev/null &\n`;
+      
+      try { fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 }); } catch(e) { console.error('Script write failed', e); }
+      
+      const osa = `osascript -e 'do shell script "bash ${scriptPath}" with administrator privileges'`;
       
       console.log("[TrafficSniffer] Requesting admin privileges for tcpdump...");
-      exec(osa, (err, stdout, stderr) => {
-        if (err) {
-            console.error("TrafficSniffer: Auth failed or cancelled", err);
-            callback({ 
-              proto: 'SYS', 
-              method: 'ERR', 
-              domain: 'Capture auth failed. Click WAF tab again to retry.', 
-              time: new Date().toLocaleTimeString('en-US', {hour12:false}) 
-            });
+      exec(osa, { timeout: 30000 }, (err) => {
+        if (err && err.signal !== 'SIGTERM') {
+            console.error("TrafficSniffer: Auth failed", err.message);
+            callback({ proto: 'SYS', method: 'ERR', domain: 'Capture auth failed — accept the admin prompt.', time: new Date().toLocaleTimeString('en-US', {hour12:false}) });
         } else {
             console.log("[TrafficSniffer] Capture started successfully.");
         }
+        try { fs.unlinkSync(scriptPath); } catch(e) {}
       });
       
-      // 2) Start tailing the dump file
+      // 2) Start tailing the dump file after a short delay
       setTimeout(() => {
         this.tailProcess = spawn('tail', ['-f', this.logFile]);
         let buffer = '';
@@ -54,6 +54,7 @@ class TrafficSniffer {
           }
         });
       }, 2000);
+
       
     } else {
         // Mock fallback for non-mac environments
@@ -106,19 +107,34 @@ class TrafficSniffer {
   resolveIp(ip) {
       if (this.ipCache[ip]) return Promise.resolve(this.ipCache[ip]);
       
-      // Known popular IP blocks for a better "WOW" factor in Hackathon
+      // Known popular IP blocks — broad ranges for major services
       const commonSites = {
-          '216.239.34.': 'google.com',
-          '172.217.': 'google-services.net',
+          '216.239.': 'google.com',
+          '172.217.': 'google.com',
           '142.250.': 'google.com',
+          '74.125.': 'google.com',
+          '64.233.': 'google.com',
+          '66.102.': 'google.com',
           '17.': 'apple.com',
-          '23.': 'akamai-cdn.net',
-          '151.101.': 'fastly-edge.net',
+          '23.': 'akamai.net',
+          '72.21.': 'amazon-cdn.net',
+          '54.': 'amazonaws.com',
+          '151.101.': 'fastly.net',
           '104.16.': 'cloudflare.com',
+          '104.17.': 'cloudflare.com',
           '104.18.': 'cloudflare.com',
-          '185.199.108.': 'github.io',
-          '140.82.112.': 'github.com',
-          '13.107.42.14': 'microsoft.com'
+          '104.19.': 'cloudflare.com',
+          '185.199.': 'github.io',
+          '140.82.': 'github.com',
+          '13.107.': 'microsoft.com',
+          '52.112.': 'microsoft.com',
+          '20.': 'azure.microsoft.com',
+          '157.240.': 'facebook.com',
+          '31.13.': 'facebook.com',
+          '8.8.': 'dns.google',
+          '1.1.': 'cloudflare-dns.com',
+          '34.': 'google-cloud.com',
+          '35.': 'google-cloud.com',
       };
 
       for (let prefix in commonSites) {
