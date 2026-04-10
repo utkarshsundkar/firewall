@@ -5,18 +5,15 @@ const dns = require('dns');
 class TrafficSniffer {
   constructor() {
     this.tailProcess = null;
-    this.logFile = '/tmp/aegis_sniff.log';
+    this.logFile = `/tmp/aegis_sniff_${Date.now()}.log`;
     this.ipCache = {};
   }
 
   async start(targetIp, callback) {
     this.stop();
     
-    // reset log file
-    if (fs.existsSync(this.logFile)) {
-      try { fs.unlinkSync(this.logFile); } catch(e){}
-    }
-    fs.writeFileSync(this.logFile, '');
+    // ensure log file exists and is writable
+    try { fs.writeFileSync(this.logFile, ''); } catch(e){ console.error("Log init failed", e); }
 
     if (process.platform === 'darwin') {
       let iface = 'any'; // Listen on all interfaces (including bridge100 for internet sharing)

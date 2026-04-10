@@ -48,7 +48,9 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     // Trigger one-time authorization on startup to cache credentials
-    checkAuthorization();
+    checkAuthorization(() => {
+        initServices();
+    });
   });
 
   mainWindow.on('closed', () => {
@@ -56,7 +58,7 @@ function createWindow() {
   });
 }
 
-function checkAuthorization() {
+function checkAuthorization(callback) {
   if (process.platform === 'darwin') {
     // macOS: Unlock driver and hosts, and ensure Aegis anchor is declared in pf.conf
     const setupScript = [
@@ -73,6 +75,7 @@ function checkAuthorization() {
     const osa = `osascript -e 'do shell script "${setupScript}" with administrator privileges'`;
     exec(osa, (err) => {
        if (!err) console.log('Aegis MacOS Authorized & Anchor Linked');
+       if (callback) callback();
     });
   } else if (process.platform === 'win32') {
     // Windows: Unlock hosts file for direct access and verify firewall
@@ -82,7 +85,10 @@ function checkAuthorization() {
     const psScript = `Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile -Command "${psCommand}"' -Wait`;
     exec(`powershell -NoProfile -Command "${psScript}"`, (err) => {
       if (!err) console.log('Aegis Windows Authorized');
+      if (callback) callback();
     });
+  } else {
+      if (callback) callback();
   }
 }
 
@@ -378,7 +384,6 @@ ipcMain.on('window-close', () => { if (mainWindow) mainWindow.hide(); });
 app.whenReady().then(() => {
   createWindow();
   setupTray();
-  initServices();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
