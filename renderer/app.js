@@ -1186,7 +1186,27 @@ function initEnterpriseTab() {
       document.getElementById('ent-server-ips').innerHTML = ipHtml;
       showToast('🏢 Admin Server Started', res.globalUrl ? 'Public Internet Tunnel Active' : 'Ready to accept local Agent connections.', 'success');
       document.getElementById('ent-live-dot').style.display = 'inline-block';
+      document.getElementById('ent-bulk-actions').style.display = 'block';
     }
+  });
+
+  // Bulk Master Controls
+  document.getElementById('btn-ent-bulk-block').addEventListener('click', async () => {
+    const domain = document.getElementById('ent-bulk-domain').value.trim();
+    if (!domain) return;
+    await window.aegis.entBroadcastWebsiteBlock(domain);
+    showToast('🚀 Global Policy Pushed', `Blocking ${domain} on all connected agents...`, 'high');
+    document.getElementById('ent-bulk-domain').value = '';
+  });
+
+  document.getElementById('btn-ent-bulk-fw-on').addEventListener('click', async () => {
+    await window.aegis.entBroadcastToggleFirewall(true);
+    showToast('⚖️ Fleet Protection', 'Enabling firewalls on all remote agents...', 'success');
+  });
+
+  document.getElementById('btn-ent-bulk-fw-off').addEventListener('click', async () => {
+    await window.aegis.entBroadcastToggleFirewall(false);
+    showToast('⚠️ Fleet Warning', 'Disabling firewalls on all remote agents...', 'high');
   });
 
   document.getElementById('btn-ent-stop').addEventListener('click', async () => {
@@ -1195,6 +1215,7 @@ function initEnterpriseTab() {
     document.getElementById('btn-ent-stop').style.display = 'none';
     document.getElementById('ent-server-info').style.display = 'none';
     document.getElementById('ent-live-dot').style.display = 'none';
+    document.getElementById('ent-bulk-actions').style.display = 'none';
     document.getElementById('ent-agents-tbody').innerHTML = '<tr><td colspan="7" class="loading-td">No agents connected. Start the server to accept connections.</td></tr>';
   });
 

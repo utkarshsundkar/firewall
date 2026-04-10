@@ -231,6 +231,18 @@ class EnterpriseManager {
     }
   }
 
+  // Pushes a command to ALL connected agents simultaneously
+  broadcastCommand(type, payload) {
+    if (this.mode !== 'server') return;
+    const msg = JSON.stringify({ type, ...payload });
+    this.agents.forEach(ag => {
+      if (ag.ws.readyState === WebSocket.OPEN) {
+        ag.ws.send(msg);
+      }
+    });
+    return true;
+  }
+
   /* ── AGENT LOGIC ───────────────────────────────────────────── */
   startAgentSync() {
     if (this.syncInterval) clearInterval(this.syncInterval);

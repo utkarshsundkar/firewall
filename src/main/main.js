@@ -302,6 +302,12 @@ ipcMain.handle('enterprise:request-full-state', async (event, agentId) => {
   enterpriseManager.sendCommandToAgent(agentId, 'REQUEST_FULL_STATE', {});
   return true;
 });
+ipcMain.handle('enterprise:broadcast-website-block', async (event, { domain }) => {
+  return enterpriseManager.broadcastCommand('BLOCK_WEBSITE', { domain });
+});
+ipcMain.handle('enterprise:broadcast-toggle-firewall', async (event, { enabled }) => {
+  return enterpriseManager.broadcastCommand('SET_FIREWALL_STATE', { enabled });
+});
 
 ipcMain.on('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.on('window-maximize', () => {

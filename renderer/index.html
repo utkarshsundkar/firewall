@@ -731,6 +731,37 @@
             <div id="ent-client-status" style="margin-top:16px; font-size:13px; text-align:center; color:var(--text-muted)">Disconnected</div>
           </div>
         </div>
+
+        <!-- BULK ACTIONS CARD -->
+        <div class="card" id="ent-bulk-actions" style="margin-top:20px; border-top: 4px solid var(--accent); display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+             <div>
+               <h3 style="margin:0">Fleet-Wide Bulk Policies</h3>
+               <p style="margin:4px 0 0 0; font-size:12px; color:var(--text-secondary)">Push instant security changes to ALL connected agents simultaneously.</p>
+             </div>
+             <div class="pill pill-high">GLOBAL CONTROL</div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;">
+             <div style="background: var(--bg-input); padding: 16px; border-radius: 8px;">
+                <h4 style="margin:0 0 12px 0; display:flex; align-items:center; gap:8px">🌐 Global Domain Block</h4>
+                <div style="display: flex; gap: 8px;">
+                   <input type="text" id="ent-bulk-domain" placeholder="e.g. facebook.com" style="flex:1" />
+                   <button class="btn-danger" id="btn-ent-bulk-block">Block for All</button>
+                </div>
+             </div>
+             <div style="background: var(--bg-input); padding: 16px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <h4 style="margin:0 0 4px 0">🛡️ Fleet Firewall</h4>
+                  <p style="margin:0; font-size:11px; color:var(--text-muted)">Master toggle for all device firewalls</p>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn-primary btn-sm" id="btn-ent-bulk-fw-on">Enable All</button>
+                  <button class="btn-danger btn-sm" id="btn-ent-bulk-fw-off">Disable All</button>
+                </div>
+             </div>
+          </div>
+        </div>
+
         <div class="card" style="margin-top:20px;">
           <div class="card-header">
             <h3>Connected Agents</h3>

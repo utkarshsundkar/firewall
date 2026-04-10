@@ -65,6 +65,8 @@ contextBridge.exposeInMainWorld('aegis', {
   entSetAppRule: (agentId, appName, action) => ipcRenderer.invoke('enterprise:set-app-rule', { agentId, appName, action }),
   entBlockWebsite: (agentId, domain) => ipcRenderer.invoke('enterprise:block-website', { agentId, domain }),
   entRequestFullState: (agentId) => ipcRenderer.invoke('enterprise:request-full-state', agentId),
+  entBroadcastWebsiteBlock: (domain) => ipcRenderer.invoke('enterprise:broadcast-website-block', { domain }),
+  entBroadcastToggleFirewall: (enabled) => ipcRenderer.invoke('enterprise:broadcast-toggle-firewall', { enabled }),
   onEntStatus: (cb) => ipcRenderer.on('enterprise-status', (_, data) => cb(data)),
   onEntAgentsUpdated: (cb) => ipcRenderer.on('enterprise-agents-updated', (_, agents) => cb(agents)),
   onEntAgentPacket: (cb) => ipcRenderer.on('enterprise-agent-packet', (_, data) => cb(data)),
