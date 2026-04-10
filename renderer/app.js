@@ -1416,7 +1416,7 @@ window.aegis.onEntAgentState(({ agentId, state }) => {
           ${isBlocked ? 'Unblock' : 'Block'}
         </button>
       </div>`;
-    }).join('') || '<div class="loading-td">No applications found on remote system.</div>';
+    }).join('') || '<div class="loading-td" style="grid-column: 1/-1; text-align:center; padding:40px; color:var(--text-muted)">Searching for applications on remote system...</div>';
   }
 
   // 4. Web Blocker

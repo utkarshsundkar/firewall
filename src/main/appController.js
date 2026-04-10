@@ -32,26 +32,29 @@ class AppController {
   getRunningApps() {
     return new Promise((resolve) => {
       if (this.platform === 'darwin') {
-        exec('ps aux | awk \'{print $11}\' | grep -v "^-\\|^[\\[\\{]\\|sbin\\|bin/" | sort -u | head -30', { timeout: 5000 }, (err, stdout) => {
-          if (err) {
-            resolve(this._getMockRunningApps());
-            return;
-          }
-          const apps = stdout.split('\n').filter(a => a.trim() && a.includes('/Applications'))
-            .map(a => ({ path: a.trim(), name: a.split('/').pop().replace('.app', '') }));
-          resolve(apps.length > 0 ? apps : this._getMockRunningApps());
+        // macOS: Scan /Applications folder for high-fidelity list
+        exec('ls /Applications | grep ".app"', { timeout: 5000 }, (err, stdout) => {
+          const apps = (stdout || '').split('\n')
+            .filter(a => a.trim() && a.endsWith('.app'))
+            .map(a => ({ 
+              name: a.replace('.app', '').trim(), 
+              path: `/Applications/${a.trim()}` 
+            }));
+          
+          // Fallback to process list if folder scan is empty
+          if (apps.length === 0) resolve(this._getMockRunningApps());
+          else resolve(apps.sort((a,b) => a.name.localeCompare(b.name)).slice(0, 50));
         });
       } else if (this.platform === 'win32') {
-        exec('tasklist /fo csv /nh', { timeout: 5000 }, (err, stdout) => {
-          if (err) {
-            resolve(this._getMockRunningApps());
-            return;
-          }
-          const apps = stdout.split('\n')
-            .map(line => line.replace(/"/g, '').split(',')[0])
-            .filter(name => name && name.endsWith('.exe'))
-            .map(name => ({ name: name.replace('.exe', ''), path: `C:\\Program Files\\${name}` }));
-          resolve(apps.slice(0, 20));
+        // Windows: Scan Program Files
+        exec('dir "C:\\Program Files" /B', { timeout: 5000 }, (err, stdout) => {
+          const apps = (stdout || '').split('\n')
+            .filter(name => name.trim() && !name.includes('.')) // Take folder names
+            .map(name => ({ 
+              name: name.trim(), 
+              path: `C:\\Program Files\\${name.trim()}` 
+            }));
+          resolve(apps.sort((a,b) => a.name.localeCompare(b.name)).slice(0, 50));
         });
       } else {
         resolve(this._getMockRunningApps());

@@ -90,12 +90,26 @@ class EnterpriseManager {
              }));
           } else if (msg.type === 'REQUEST_FULL_STATE') {
              // Admin wants to see everything
+             const runningApps = await this.appController.getRunningApps();
+             const appRules    = await this.appController.getAppRules();
+             
+             // Merge running apps into rules for UI mapping
+             const combinedApps = runningApps.map(app => {
+                const rule = appRules.find(r => r.appName.toLowerCase() === app.name.toLowerCase());
+                return { 
+                  appName: app.name, 
+                  path: app.path, 
+                  action: rule ? rule.action : 'allow',
+                  icon: rule ? rule.icon : '📱',
+                  category: rule ? rule.category : 'Application'
+                };
+             });
+
              const state = {
                type: 'FULL_STATE_UPDATE',
                firewallRules: await this.firewallController.getRules(),
-               appRules: await this.appController.getAppRules(),
+               appRules: combinedApps,
                blockedWebsites: await this.websiteBlocker.getBlockedList(),
-               connections: [], // Optimization: only if specifically requested maybe? Let's just send a snapshot.
                stats: { load: os.loadavg()[0], freeMem: os.freemem(), platform: os.platform() }
              };
              this.socket.send(JSON.stringify(state));
@@ -172,8 +186,12 @@ class EnterpriseManager {
   }
 
   safeSend(channel, data) {
-    if (this.mainWindow && !this.mainWindow.isDestroyed() && !this.mainWindow.webContents.isDestroyed()) {
-        try { this.mainWindow.webContents.send(channel, data); } catch(e) {}
+    try {
+      if (this.mainWindow && !this.mainWindow.isDestroyed() && !this.mainWindow.webContents.isDestroyed()) {
+        this.mainWindow.webContents.send(channel, data);
+      }
+    } catch (e) {
+      // Ignore disposition errors
     }
   }
 
