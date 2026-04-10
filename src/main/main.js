@@ -58,23 +58,25 @@ function createWindow() {
 
 function checkAuthorization() {
   if (process.platform === 'darwin') {
-    // ULTIMATE HACK: Granting user access to the PF driver and hosts file
-    // This allows the entire app to manage the firewall and blocks WITHOUT recurring prompts.
+    // macOS: Unlock driver and hosts
     const setupScript = [
-      'chmod 666 /etc/hosts',             // Unlock website blocking
-      'chmod 666 /dev/pf',               // UNLOCK FIREWALL DRIVER (The 'Ask Once' Secret)
-      'pfctl -E || true',                 // Enable firewall
-      'pfctl -f /etc/pf.conf || true'     // Initial rule load
+      'chmod 666 /etc/hosts',
+      'chmod 666 /dev/pf',
+      'pfctl -E || true',
+      'pfctl -f /etc/pf.conf || true'
     ].join(' && ');
-
     const osa = `osascript -e 'do shell script "${setupScript}" with administrator privileges'`;
-    
     exec(osa, (err) => {
-      if (err) {
-        console.log('Final auth cancelled or failed');
-      } else {
-        console.log('Aegis Total Control Authorized (One-Prompt Mode Active)');
-      }
+       if (!err) console.log('Aegis MacOS Authorized');
+    });
+  } else if (process.platform === 'win32') {
+    // Windows: Unlock hosts file and verify firewall
+    // Using icacls to grant full permissions to the current user for the hosts file
+    const currentUser = process.env.USERNAME;
+    const hostsPath = 'C:\\Windows\\System32\\drivers\\etc\\hosts';
+    const psScript = `Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile -Command "icacls \\"${hostsPath}\\" /grant \\"${currentUser}:(F)\\"; netsh advfirewall set allprofiles state on"' -Wait`;
+    exec(`powershell -NoProfile -Command "${psScript}"`, (err) => {
+      if (!err) console.log('Aegis Windows Authorized');
     });
   }
 }

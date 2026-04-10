@@ -108,8 +108,7 @@ class WebsiteBlocker {
     try { fs.writeFileSync(tmpPath, newContent, 'utf8'); } catch(e) {}
 
     if (process.platform === 'win32') {
-      const psScript = `Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile -Command "Copy-Item ''${tmpPath.replace(/\\/g, '\\\\')}'' ''${HOSTS_PATH}'' -Force; ipconfig /flushdns"' -Wait`;
-      exec(`powershell -NoProfile -Command "${psScript}"`, { timeout: 30000 }, (err) => callback(err));
+      exec('ipconfig /flushdns', (err) => callback(err));
     } else {
       const shellScript = [
         `cp \\"${tmpPath}\\" \\"${HOSTS_PATH}\\"`,
